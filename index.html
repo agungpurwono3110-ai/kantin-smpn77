@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SISTEM KANTIN SMPN 77 - Manajemen & Kasir Profesional</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>">
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="bg-light">
+
+  <!-- ==================== LOGIN OVERLAY MODAL ==================== -->
+  <div id="login-overlay" class="login-wrapper d-none">
+    <div class="card shadow-lg border-0 login-card">
+      <div class="card-body p-4 p-md-5 text-center">
+        <div class="brand-logo mb-3">
+          <div class="logo-icon bg-primary text-white mx-auto shadow">
+            <i class="bi bi-shop-window"></i>
+          </div>
+        </div>
+        <h4 class="fw-bold text-navy mb-1">KANTIN SMPN 77</h4>
+        <p class="text-muted small mb-4">Sistem Manajemen & Kasir Operasional</p>
+
+        <form id="form-login" onsubmit="App.handleLogin(event)">
+          <div class="mb-3 text-start">
+            <label class="form-label small fw-semibold text-secondary">Username</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-person text-muted"></i></span>
+              <input type="text" id="login-username" class="form-control" placeholder="Masukkan username..." required autocomplete="username">
+            </div>
+          </div>
+          <div class="mb-4 text-start">
+            <label class="form-label small fw-semibold text-secondary">PIN / Password</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-key text-muted"></i></span>
+              <input type="password" id="login-password" class="form-control" placeholder="Masukkan PIN / Sandi..." required autocomplete="current-password">
+              <button class="btn btn-outline-secondary" type="button" onclick="App.togglePasswordVisibility('login-password')">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold shadow-sm">
+            <i class="bi bi-box-arrow-in-right me-1"></i> Masuk Sistem
+          </button>
+        </form>
+      </div>
+      <div class="card-footer bg-light text-center py-2 text-muted small border-0">
+        Operasional Khusus 1 Karyawan &bull; SMP Negeri 77
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN APP WRAPPER ==================== -->
+  <div id="app-wrapper" class="d-flex flex-column flex-md-row min-vh-100">
+
+    <!-- Mobile Top Header -->
+    <header class="d-md-none bg-primary text-white d-flex justify-content-between align-items-center px-3 py-2 shadow-sm sticky-top">
+      <button class="btn btn-sm btn-outline-light border-0" id="btn-toggle-sidebar" onclick="App.toggleSidebar()">
+        <i class="bi bi-list fs-4"></i>
+      </button>
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-shop fs-5"></i>
+        <span class="fw-bold">KANTIN SMPN 77</span>
+      </div>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+          <i class="bi bi-person-fill text-primary"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+          <li><span class="dropdown-item-text small fw-bold text-muted" id="user-display-mobile">Karyawan</span></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item small" href="#" onclick="App.navigate('pengaturan')"><i class="bi bi-gear me-2"></i>Pengaturan</a></li>
+          <li><a class="dropdown-item small text-danger" href="#" onclick="App.handleLogout()"><i class="bi bi-box-arrow-right me-2"></i>Keluar</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="sidebar bg-white border-end d-flex flex-column">
+      <!-- Sidebar Brand Header -->
+      <div class="sidebar-brand px-3 py-3 border-bottom d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <div class="sidebar-logo bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm">
+            <i class="bi bi-shop-window fs-5"></i>
+          </div>
+          <div>
+            <h6 class="fw-bold mb-0 text-navy font-title">KANTIN SMPN 77</h6>
+            <small class="text-muted" style="font-size: 11px;">Sistem Manajemen Kasir</small>
+          </div>
+        </div>
+        <button class="btn-close d-md-none" onclick="App.toggleSidebar()"></button>
+      </div>
+
+      <!-- Quick Operational Info Badge -->
+      <div class="px-3 py-2 bg-light-subtle border-bottom small text-muted d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-event me-1 text-primary"></i> <b id="sidebar-op-date">-</b></span>
+        <span class="badge bg-success-subtle text-success border border-success-subtle" id="badge-operasional-status">Aktif</span>
+      </div>
+
+      <!-- Sidebar Menu List (16 Menus) -->
+      <div class="sidebar-menu flex-grow-1 overflow-y-auto py-2">
+        <div class="menu-label px-3 text-uppercase fw-bold text-muted small mb-1" style="font-size: 10px;">Menu Utama</div>
+        <ul class="nav nav-pills flex-column px-2 gap-1">
+          <li class="nav-item">
+            <a class="nav-link active" data-view="dashboard" href="#" onclick="App.navigate('dashboard', event)">
+              <i class="bi bi-grid-1x2-fill me-2 menu-icon text-primary"></i> Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link nav-highlight" data-view="penjualan" href="#" onclick="App.navigate('penjualan', event)">
+              <i class="bi bi-cart-check-fill me-2 menu-icon text-success"></i> Penjualan Harian
+              <span class="badge bg-danger rounded-pill ms-auto small" id="badge-cart-count" style="display:none;">0</span>
+            </a>
+          </li>
+          <li class="nav-item admin-only">
+            <a class="nav-link" data-view="rekap-penjualan" href="#" onclick="App.navigate('rekap-penjualan', event)">
+              <i class="bi bi-journal-text me-2 menu-icon text-info"></i> Rekap Penjualan
+            </a>
+          </li>
+        </ul>
+
+        <div class="menu-label px-3 text-uppercase fw-bold text-muted small mt-3 mb-1" style="font-size: 10px;">Inventori & Stok</div>
+        <ul class="nav nav-pills flex-column px-2 gap-1">
+          <li class="nav-item admin-only">
+            <a class="nav-link" data-view="master-produk" href="#" onclick="App.navigate('master-produk', event)">
+              <i class="bi bi-box-seam-fill me-2 menu-icon text-indigo"></i> Master Produk
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="stok-barang" href="#" onclick="App.navigate('stok-barang', event)">
+              <i class="bi bi-boxes me-2 menu-icon text-warning"></i> Stok Barang
+              <span class="badge bg-warning text-dark rounded-pill ms-auto small" id="badge-low-stock" style="display:none;">0</span>
+            </a>
+          </li>
+          <li class="nav-item admin-only">
+            <a class="nav-link" data-view="barang-masuk" href="#" onclick="App.navigate('barang-masuk', event)">
+              <i class="bi bi-truck-flatbed me-2 menu-icon text-primary"></i> Barang Masuk / Restock
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link nav-highlight-opname" data-view="stok-opname" href="#" onclick="App.navigate('stok-opname', event)">
+              <i class="bi bi-clipboard2-check-fill me-2 menu-icon text-danger"></i> Stok Opname (Istirahat 2)
+            </a>
+          </li>
+        </ul>
+
+        <div class="menu-label px-3 text-uppercase fw-bold text-muted small mt-3 mb-1 admin-only" style="font-size: 10px;">Keuangan & Kas</div>
+        <ul class="nav nav-pills flex-column px-2 gap-1 admin-only">
+          <li class="nav-item">
+            <a class="nav-link" data-view="kas-harian" href="#" onclick="App.navigate('kas-harian', event)">
+              <i class="bi bi-wallet2 me-2 menu-icon text-emerald"></i> Kas Harian
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="pengeluaran" href="#" onclick="App.navigate('pengeluaran', event)">
+              <i class="bi bi-cash-stack me-2 menu-icon text-danger"></i> Pengeluaran Operasional
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="hutang-supplier" href="#" onclick="App.navigate('hutang-supplier', event)">
+              <i class="bi bi-receipt-cutoff me-2 menu-icon text-orange"></i> Hutang Supplier
+              <span class="badge bg-danger rounded-pill ms-auto small" id="badge-debt-count" style="display:none;">0</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="supplier" href="#" onclick="App.navigate('supplier', event)">
+              <i class="bi bi-people-fill me-2 menu-icon text-secondary"></i> Data Supplier
+            </a>
+          </li>
+        </ul>
+
+        <div class="menu-label px-3 text-uppercase fw-bold text-muted small mt-3 mb-1" style="font-size: 10px;">Laporan & Riwayat</div>
+        <ul class="nav nav-pills flex-column px-2 gap-1">
+          <li class="nav-item admin-only">
+            <a class="nav-link" data-view="laporan-keuntungan" href="#" onclick="App.navigate('laporan-keuntungan', event)">
+              <i class="bi bi-graph-up-arrow me-2 menu-icon text-success"></i> Laporan Keuntungan
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="riwayat-transaksi" href="#" onclick="App.navigate('riwayat-transaksi', event)">
+              <i class="bi bi-clock-history me-2 menu-icon text-purple"></i> Riwayat Transaksi
+            </a>
+          </li>
+          <li class="nav-item admin-only">
+            <a class="nav-link" data-view="laporan-bulanan" href="#" onclick="App.navigate('laporan-bulanan', event)">
+              <i class="bi bi-calendar3 me-2 menu-icon text-primary"></i> Laporan Bulanan
+            </a>
+          </li>
+        </ul>
+
+        <div class="menu-label px-3 text-uppercase fw-bold text-muted small mt-3 mb-1 admin-only" style="font-size: 10px;">Sistem</div>
+        <ul class="nav nav-pills flex-column px-2 gap-1 mb-4 admin-only">
+          <li class="nav-item">
+            <a class="nav-link" data-view="backup-restore" href="#" onclick="App.navigate('backup-restore', event)">
+              <i class="bi bi-database-check me-2 menu-icon text-teal"></i> Backup & Restore Data
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-view="pengaturan" href="#" onclick="App.navigate('pengaturan', event)">
+              <i class="bi bi-gear-fill me-2 menu-icon text-secondary"></i> Pengaturan Akun
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- User Info & Logout on Bottom of Sidebar -->
+      <div class="sidebar-footer p-3 border-top bg-light d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2 overflow-hidden">
+          <div class="avatar bg-primary text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="fw-bold small text-navy text-truncate" id="user-display-name">Karyawan Kantin</div>
+            <div class="text-muted text-truncate" style="font-size: 11px;">SMPN 77 Jakarta</div>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-danger border-0 rounded-circle" title="Keluar" onclick="App.handleLogout()">
+          <i class="bi bi-box-arrow-right fs-6"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="flex-grow-1 bg-light p-2 p-md-4 overflow-y-auto">
+      
+      <!-- Top Bar for Desktop -->
+      <div class="d-none d-md-flex align-items-center justify-content-between mb-4 bg-white p-3 rounded-3 shadow-sm border">
+        <div class="d-flex align-items-center gap-3">
+          <h5 class="fw-bold mb-0 text-navy" id="page-title"><i class="bi bi-grid-1x2-fill me-2 text-primary"></i> Dashboard Utama</h5>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" id="top-op-badge">
+            <i class="bi bi-calendar-check me-1"></i> <span id="top-date-display">-</span>
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span id="badge-connection-status" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small fw-semibold">
+            <i class="bi bi-hdd-network me-1"></i> Mode Offline (Lokal)
+          </span>
+          <!-- Quick Cash Summary Pill -->
+          <div class="quick-cash-pill px-3 py-1 bg-success-subtle border border-success-subtle rounded-pill text-success small fw-semibold">
+            <i class="bi bi-cash-stack me-1"></i> Kas Hari Ini: <span id="top-quick-cash">Rp 0</span>
+          </div>
+          <!-- POS Shortcut Button -->
+          <button class="btn btn-primary btn-sm px-3 rounded-pill fw-semibold shadow-sm" onclick="App.navigate('penjualan')">
+            <i class="bi bi-cart-plus me-1"></i> Kasir Penjualan
+          </button>
+          <!-- Opname Shortcut Button -->
+          <button class="btn btn-outline-danger btn-sm px-3 rounded-pill fw-semibold" onclick="App.navigate('stok-opname')">
+            <i class="bi bi-clipboard-check me-1"></i> Stok Opname
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW CONTAINERS -->
+      <div id="views-wrapper">
+
+        <!-- ==================== 1. DASHBOARD VIEW ==================== -->
+        <section id="view-dashboard" class="app-view">
+          <!-- 5 Required Themed Metric Cards -->
+          <div class="row g-3 mb-4">
+            <!-- 1. Biru: Total Omzet Hari Ini -->
+            <div class="col-6 col-lg-4 col-xl-2-4 admin-only">
+              <div class="card stat-card border-0 shadow-sm card-blue h-100">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-title text-muted small fw-semibold">Omzet Hari Ini</span>
+                    <span class="stat-icon bg-blue-subtle text-blue"><i class="bi bi-cash-coin"></i></span>
+                  </div>
+                  <h4 class="fw-bold mb-1 text-blue" id="dash-omzet">Rp 0</h4>
+                  <div class="text-muted small" style="font-size: 11px;">Dari istirahat 1 & 2</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Hijau: Keuntungan Kotor & Bersih -->
+            <div class="col-6 col-lg-4 col-xl-2-4 admin-only">
+              <div class="card stat-card border-0 shadow-sm card-green h-100">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-title text-muted small fw-semibold">Keuntungan Bersih</span>
+                    <span class="stat-icon bg-green-subtle text-green"><i class="bi bi-graph-up"></i></span>
+                  </div>
+                  <h4 class="fw-bold mb-1 text-green" id="dash-keuntungan-bersih">Rp 0</h4>
+                  <div class="text-muted small" style="font-size: 11px;">Laba Kotor: <span id="dash-keuntungan-kotor" class="fw-semibold">Rp 0</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Merah: Pengeluaran Operasional -->
+            <div class="col-6 col-lg-4 col-xl-2-4 admin-only">
+              <div class="card stat-card border-0 shadow-sm card-red h-100">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-title text-muted small fw-semibold">Pengeluaran</span>
+                    <span class="stat-icon bg-red-subtle text-red"><i class="bi bi-receipt"></i></span>
+                  </div>
+                  <h4 class="fw-bold mb-1 text-red" id="dash-pengeluaran">Rp 0</h4>
+                  <div class="text-muted small" style="font-size: 11px;">Biaya operasional kantin</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Oranye: Total Stok & Hampir Habis -->
+            <div class="col-6 col-lg-6 col-xl-2-4">
+              <div class="card stat-card border-0 shadow-sm card-orange h-100">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-title text-muted small fw-semibold">Stok Barang</span>
+                    <span class="stat-icon bg-orange-subtle text-orange"><i class="bi bi-box-seam"></i></span>
+                  </div>
+                  <h4 class="fw-bold mb-1 text-orange" id="dash-stok-total">0 item</h4>
+                  <div class="text-muted small" style="font-size: 11px;">Hampir Habis: <span id="dash-stok-menipis" class="badge bg-danger">0</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Ungu: Jumlah Transaksi & Barang Terjual -->
+            <div class="col-12 col-lg-6 col-xl-2-4">
+              <div class="card stat-card border-0 shadow-sm card-purple h-100">
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-title text-muted small fw-semibold">Transaksi Hari Ini</span>
+                    <span class="stat-icon bg-purple-subtle text-purple"><i class="bi bi-cart-check"></i></span>
+                  </div>
+                  <h4 class="fw-bold mb-1 text-purple" id="dash-transaksi-total">0 Trx</h4>
+                  <div class="text-muted small" style="font-size: 11px;">Total Terjual: <span id="dash-barang-terjual" class="fw-semibold">0 pcs</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Metric Row (Kas, Modal HPP, Status Operasional) -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-4 admin-only">
+              <div class="card border-0 shadow-sm h-100 bg-white">
+                <div class="card-body p-3 d-flex align-items-center gap-3">
+                  <div class="rounded-circle p-3 bg-primary-subtle text-primary">
+                    <i class="bi bi-wallet-fill fs-4"></i>
+                  </div>
+                  <div>
+                    <div class="text-muted small">Saldo Akhir Kas Hari Ini</div>
+                    <h5 class="fw-bold mb-0 text-navy" id="dash-saldo-kas">Rp 0</h5>
+                    <small class="text-muted" style="font-size: 11px;">(Tunai: <span id="dash-kas-tunai">Rp 0</span> | Non-Tunai: <span id="dash-kas-nontunai">Rp 0</span>)</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 admin-only">
+              <div class="card border-0 shadow-sm h-100 bg-white">
+                <div class="card-body p-3 d-flex align-items-center gap-3">
+                  <div class="rounded-circle p-3 bg-secondary-subtle text-secondary">
+                    <i class="bi bi-tag-fill fs-4"></i>
+                  </div>
+                  <div>
+                    <div class="text-muted small">Total Modal Barang Terjual (HPP)</div>
+                    <h5 class="fw-bold mb-0 text-dark" id="dash-hpp">Rp 0</h5>
+                    <small class="text-muted" style="font-size: 11px;">Hanya barang yang telah terjual</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm h-100 bg-white border-start border-4 border-danger">
+                <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                  <div>
+                    <div class="text-muted small">Alur Tutup Harian (Stok Opname)</div>
+                    <div class="fw-bold text-navy" id="dash-opname-status">Belum Stok Opname</div>
+                    <small class="text-muted" style="font-size: 11px;">Lakukan setelah istirahat 2 selesai</small>
+                  </div>
+                  <button class="btn btn-sm btn-danger fw-semibold px-3 rounded-pill" onclick="App.navigate('stok-opname')">
+                    Mulai Opname <i class="bi bi-arrow-right"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts & Top Products Row -->
+          <div class="row g-3 mb-4">
+            <!-- Grafik Penjualan 7 Hari Terakhir -->
+            <div class="col-lg-8">
+              <div class="card border-0 shadow-sm bg-white h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                  <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Tren Penjualan & Keuntungan (7 Hari Terakhir)</h6>
+                  <span class="badge bg-light text-muted">Update Realtime</span>
+                </div>
+                <div class="card-body p-3">
+                  <div style="position: relative; height: 260px; width: 100%;">
+                    <canvas id="chart-penjualan-harian"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Produk Paling Laris & Ringkasan Stok -->
+            <div class="col-lg-4">
+              <div class="card border-0 shadow-sm bg-white h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                  <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-trophy-fill text-warning me-2"></i>Produk Paling Laris Hari Ini</h6>
+                  <small class="text-muted">Top 5</small>
+                </div>
+                <div class="card-body p-3">
+                  <ul class="list-group list-group-flush" id="dash-top-products-list">
+                    <li class="list-group-item text-center text-muted py-4">Belum ada transaksi hari ini</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Peringatan Stok Menipis / Habis -->
+          <div class="card border-0 shadow-sm bg-white mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Peringatan Stok Menipis & Habis</h6>
+              <button class="btn btn-sm btn-outline-primary" onclick="App.navigate('barang-masuk')"><i class="bi bi-plus-circle me-1"></i>Restock Barang</button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">Kode</th>
+                      <th>Nama Produk</th>
+                      <th>Kategori</th>
+                      <th class="text-center">Stok Minimum</th>
+                      <th class="text-center">Stok Tersedia</th>
+                      <th class="text-center">Status</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-low-stock-table" class="small">
+                    <tr>
+                      <td colspan="7" class="text-center py-4 text-muted">Semua stok barang dalam kondisi aman.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 2. PENJUALAN HARIAN (POS KASIR) ==================== -->
+        <section id="view-penjualan" class="app-view d-none">
+          <div class="row g-3">
+            <!-- Left Side: Catalog & Search & Quick Category -->
+            <div class="col-lg-8">
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-3">
+                  <!-- Search & Filter Controls -->
+                  <div class="row g-2 align-items-center">
+                    <div class="col-md-7">
+                      <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="pos-search" class="form-control border-start-0" placeholder="Ketik nama atau kode produk..." oninput="POS.filterProducts()">
+                        <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('pos-search').value=''; POS.filterProducts();">
+                          <i class="bi bi-x-lg"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="col-md-5">
+                      <select id="pos-category-select" class="form-select" onchange="POS.filterProducts()">
+                        <option value="">Semua Kategori</option>
+                        <!-- Injected via JS -->
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Category Pills for Quick Tap on Mobile/Tablet -->
+                  <div class="pos-category-pills d-flex gap-1 overflow-x-auto py-2 mt-2" id="pos-quick-pills">
+                    <!-- Injected dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Product Grid Cards (Optimized for Android Touch & Big Buttons) -->
+              <div class="row g-2 g-md-3" id="pos-product-grid">
+                <!-- Injected via POS.renderProducts() -->
+              </div>
+            </div>
+
+            <!-- Right Side: Order Cart & Payment -->
+            <div class="col-lg-4">
+              <div class="card border-0 shadow-sm sticky-pos-cart">
+                <div class="card-header bg-navy text-white py-3 d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 class="fw-bold mb-0"><i class="bi bi-cart3 me-2"></i>Keranjang Belanja</h6>
+                    <small class="text-white-50" style="font-size: 11px;">Gabungan Istirahat 1 & 2</small>
+                  </div>
+                  <button class="btn btn-sm btn-outline-light py-1 px-2" onclick="POS.clearCart()" title="Kosongkan Keranjang">
+                    <i class="bi bi-trash"></i> Reset
+                  </button>
+                </div>
+                
+                <!-- Cart Items List Container -->
+                <div class="card-body p-2 overflow-y-auto pos-cart-items-container" id="pos-cart-list">
+                  <div class="text-center py-5 text-muted">
+                    <i class="bi bi-cart-x fs-1 d-block mb-2 text-secondary opacity-50"></i>
+                    <p class="mb-0 small">Keranjang masih kosong.<br>Sentuh produk di sebelah kiri untuk menambah pesanan.</p>
+                  </div>
+                </div>
+
+                <!-- Cart Summary & Action Buttons -->
+                <div class="card-footer bg-white border-top p-3">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small">Total Barang</span>
+                    <span class="fw-bold small" id="pos-total-items">0 item (0 jenis)</span>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="fw-bold text-navy">Total Pembayaran</span>
+                    <h4 class="fw-bold text-primary mb-0" id="pos-total-price">Rp 0</h4>
+                  </div>
+
+                  <!-- Checkout Button -->
+                  <button class="btn btn-primary w-100 py-3 fw-bold shadow pos-btn-checkout" id="btn-pos-checkout" onclick="POS.openPaymentModal()" disabled>
+                    <i class="bi bi-credit-card-2-front me-2"></i> PROSES PEMBAYARAN (F8)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 3. REKAP PENJUALAN ==================== -->
+        <section id="view-rekap-penjualan" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold text-muted">Tanggal Rekap</label>
+                  <input type="date" id="rekap-filter-date" class="form-control" onchange="Rekap.loadRekap()">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold text-muted">Kategori Produk</label>
+                  <select id="rekap-filter-category" class="form-select" onchange="Rekap.loadRekap()">
+                    <option value="">Semua Kategori</option>
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end pt-md-4">
+                  <button class="btn btn-outline-success me-2" onclick="Rekap.exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i> Export Excel</button>
+                  <button class="btn btn-outline-secondary" onclick="Rekap.printReport()"><i class="bi bi-printer me-1"></i> Cetak Rekap</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary Highlights -->
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Total Transaksi</small>
+                <h4 class="fw-bold text-purple mb-0" id="rekap-total-trx">0</h4>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Produk Terjual</small>
+                <h4 class="fw-bold text-orange mb-0" id="rekap-total-qty">0 pcs</h4>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Total Omzet</small>
+                <h4 class="fw-bold text-blue mb-0" id="rekap-total-omzet">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Total Keuntungan</small>
+                <h4 class="fw-bold text-green mb-0" id="rekap-total-profit">Rp 0</h4>
+              </div>
+            </div>
+          </div>
+
+          <!-- Best / Worst Seller & Categories -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-6 col-lg-3">
+              <div class="card border-0 shadow-sm p-3 h-100 bg-white">
+                <div class="small text-muted fw-semibold mb-1"><i class="bi bi-arrow-up-circle-fill text-success me-1"></i> Minuman Terlaris</div>
+                <h6 class="fw-bold mb-0 text-navy" id="rekap-top-drink">-</h6>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <div class="card border-0 shadow-sm p-3 h-100 bg-white">
+                <div class="small text-muted fw-semibold mb-1"><i class="bi bi-arrow-up-circle-fill text-primary me-1"></i> Snack Terlaris</div>
+                <h6 class="fw-bold mb-0 text-navy" id="rekap-top-snack">-</h6>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <div class="card border-0 shadow-sm p-3 h-100 bg-white">
+                <div class="small text-muted fw-semibold mb-1"><i class="bi bi-trophy-fill text-warning me-1"></i> Produk Paling Laris</div>
+                <h6 class="fw-bold mb-0 text-navy" id="rekap-best-seller">-</h6>
+              </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <div class="card border-0 shadow-sm p-3 h-100 bg-white">
+                <div class="small text-muted fw-semibold mb-1"><i class="bi bi-arrow-down-circle-fill text-danger me-1"></i> Produk Kurang Laku</div>
+                <h6 class="fw-bold mb-0 text-navy" id="rekap-worst-seller">-</h6>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rekap Detail Table -->
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy">Rincian Penjualan Barang Hari Ini</h6>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="table-rekap-penjualan">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No</th>
+                      <th>Kode</th>
+                      <th>Nama Produk</th>
+                      <th>Kategori</th>
+                      <th class="text-center">Jumlah Terjual</th>
+                      <th class="text-end">Harga Modal</th>
+                      <th class="text-end">Harga Jual</th>
+                      <th class="text-end">Total Omzet</th>
+                      <th class="text-end">Total Modal</th>
+                      <th class="text-end pe-3">Keuntungan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rekap-table-body" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                  <tfoot class="table-light fw-bold small">
+                    <tr>
+                      <td colspan="4" class="text-end ps-3">TOTAL:</td>
+                      <td class="text-center" id="rekap-foot-qty">0</td>
+                      <td></td>
+                      <td></td>
+                      <td class="text-end text-blue" id="rekap-foot-omzet">Rp 0</td>
+                      <td class="text-end" id="rekap-foot-modal">Rp 0</td>
+                      <td class="text-end pe-3 text-green" id="rekap-foot-profit">Rp 0</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 4. MASTER PRODUK ==================== -->
+        <section id="view-master-produk" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                <div class="d-flex flex-wrap gap-2 flex-grow-1">
+                  <input type="text" id="prod-search" class="form-control w-auto flex-grow-1" placeholder="Cari produk berdasarkan nama atau kode..." oninput="MasterProduk.renderTable()">
+                  <select id="prod-filter-cat" class="form-select w-auto" onchange="MasterProduk.renderTable()">
+                    <option value="">Semua Kategori</option>
+                  </select>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-primary fw-semibold" onclick="MasterProduk.openModal()"><i class="bi bi-plus-lg me-1"></i> Tambah Produk</button>
+                  <button class="btn btn-outline-success" onclick="MasterProduk.exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i> Export Excel</button>
+                  <label class="btn btn-outline-primary mb-0">
+                    <i class="bi bi-file-earmark-arrow-up me-1"></i> Import Excel
+                    <input type="file" id="prod-import-file" accept=".xlsx,.xls,.csv" class="d-none" onchange="MasterProduk.importExcel(event)">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Master Table -->
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="table-master-produk">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">Foto</th>
+                      <th>Kode</th>
+                      <th>Nama Produk</th>
+                      <th>Kategori</th>
+                      <th class="text-end">Harga Modal</th>
+                      <th class="text-end">Harga Jual</th>
+                      <th class="text-end">Keuntungan</th>
+                      <th class="text-center">Stok Min</th>
+                      <th class="text-center">Stok Tersedia</th>
+                      <th>Satuan</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="master-produk-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 5. STOK BARANG ==================== -->
+        <section id="view-stok-barang" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                  <input type="text" id="stok-search" class="form-control" placeholder="Cari nama barang..." oninput="StokBarang.renderTable()">
+                </div>
+                <div class="col-md-3">
+                  <select id="stok-filter-status" class="form-select" onchange="StokBarang.renderTable()">
+                    <option value="">Semua Status Stok</option>
+                    <option value="aman">Status: Aman</option>
+                    <option value="hampir_habis">Status: Hampir Habis</option>
+                    <option value="habis">Status: Habis</option>
+                  </select>
+                </div>
+                <div class="col-md-3 text-md-end">
+                  <button class="btn btn-outline-primary" onclick="App.navigate('barang-masuk')"><i class="bi bi-truck me-1"></i> Restock Barang</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold mb-0 text-navy">Manajemen & Status Stok Barang</h6>
+              <span class="small text-muted">Rumus: Stok Tersedia = Stok Awal + Barang Masuk - Total Terjual</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No</th>
+                      <th>Kode</th>
+                      <th>Nama Barang</th>
+                      <th>Kategori</th>
+                      <th class="text-center">Stok Awal</th>
+                      <th class="text-center">Barang Masuk</th>
+                      <th class="text-center">Total Terjual</th>
+                      <th class="text-center fw-bold">Stok Tersedia</th>
+                      <th class="text-center">Stok Min</th>
+                      <th class="text-center">Status</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stok-barang-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 6. BARANG MASUK / RESTOCK ==================== -->
+        <section id="view-barang-masuk" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+              <div class="d-flex gap-2 flex-grow-1">
+                <input type="date" id="restock-filter-date" class="form-control w-auto" onchange="BarangMasuk.renderTable()">
+                <input type="text" id="restock-search" class="form-control w-auto flex-grow-1" placeholder="Cari supplier atau barang..." oninput="BarangMasuk.renderTable()">
+              </div>
+              <button class="btn btn-primary fw-semibold" onclick="BarangMasuk.openModal()"><i class="bi bi-plus-lg me-1"></i> Catat Barang Masuk</button>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold mb-0 text-navy">Riwayat Pembelian & Penambahan Stok (Restock)</h6>
+              <span class="small text-muted">Pembelian Tunai otomatis memotong Kas, Pembelian Tempo masuk Hutang</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No. Faktur</th>
+                      <th>Tanggal</th>
+                      <th>Supplier</th>
+                      <th>Nama Produk</th>
+                      <th class="text-center">Jumlah Masuk</th>
+                      <th class="text-end">Harga Beli Satuan</th>
+                      <th class="text-end">Total Pembelian</th>
+                      <th class="text-center">Pembayaran</th>
+                      <th class="text-center">Status</th>
+                      <th>Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="restock-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 7. STOK OPNAME (SETELAH ISTIRAHAT KEDUA) ==================== -->
+        <section id="view-stok-opname" class="app-view d-none">
+          <!-- Important Notice Banner -->
+          <div class="alert alert-warning border-warning-subtle shadow-sm mb-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-octagon-fill fs-3 text-warning"></i>
+                <div>
+                  <h6 class="alert-heading fw-bold mb-0">Stok Opname Harian (Dilakukan Setelah Istirahat Kedua Selesai)</h6>
+                  <small class="text-muted">Masukkan jumlah fisik barang yang ada di etalase kantin. Sistem otomatis membandingkan dengan stok sistem.</small>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-dark btn-sm fw-semibold" onclick="StokOpname.printReport()">
+                  <i class="bi bi-printer me-1"></i> Cetak Laporan Opname
+                </button>
+                <button class="btn btn-danger btn-sm fw-bold px-3 shadow" id="btn-konfirmasi-tutup-harian" onclick="StokOpname.konfirmasiTutupHarian()">
+                  <i class="bi bi-lock-fill me-1"></i> KONFIRMASI & TUTUP HARIAN
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variance Summary Alert (Shown if variance exists) -->
+          <div id="opname-diff-alert" class="alert alert-danger d-none border-danger shadow-sm mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <span class="fw-bold">PERINGATAN:</span> Terdapat selisih antara stok sistem dan fisik pada beberapa produk! Pastikan mengisi alasan selisih pada kolom keterangan.
+          </div>
+
+          <!-- Stock Opname Main Table -->
+          <div class="card border-0 shadow-sm bg-white mb-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="fw-bold mb-0 text-navy">Formulir Pemeriksaan Stok Fisik</h6>
+                <small class="text-muted">Tanggal: <b id="opname-cur-date">-</b> | Status Hari: <span class="badge bg-success" id="opname-status-badge">Terbuka</span></small>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="StokOpname.samakanSemuaStokFisik()" title="Salin semua stok sistem ke kolom fisik">
+                  <i class="bi bi-magic me-1"></i> Salin Stok Sistem (Cepat)
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="StokOpname.simpanDraft()">
+                  <i class="bi bi-save me-1"></i> Simpan Hasil Hitung
+                </button>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0" id="table-stok-opname">
+                  <thead class="table-light small text-center">
+                    <tr>
+                      <th style="width: 40px;">No</th>
+                      <th style="min-width: 180px;" class="text-start">Nama Produk</th>
+                      <th style="width: 90px;">Stok Awal</th>
+                      <th style="width: 90px;">Barang Masuk</th>
+                      <th style="width: 90px;">Total Terjual</th>
+                      <th style="width: 110px;" class="bg-primary-subtle text-primary fw-bold">Stok Akhir Sistem</th>
+                      <th style="width: 130px;" class="bg-warning-subtle text-dark fw-bold">Stok Fisik Real</th>
+                      <th style="width: 90px;">Selisih</th>
+                      <th style="min-width: 180px;">Keterangan Selisih</th>
+                    </tr>
+                  </thead>
+                  <tbody id="opname-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 8. KAS HARIAN ==================== -->
+        <section id="view-kas-harian" class="app-view d-none">
+          <!-- Kas Summary Cards -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <div class="text-muted small fw-semibold">Saldo Awal Kas</div>
+                <h4 class="fw-bold text-dark mb-0" id="kas-saldo-awal">Rp 0</h4>
+                <small class="text-muted">Modal kas awal hari</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <div class="text-muted small fw-semibold">Total Pemasukan Kas Hari Ini</div>
+                <h4 class="fw-bold text-success mb-0" id="kas-total-in">Rp 0</h4>
+                <small class="text-muted">(Tunai: <span id="kas-penjualan-tunai">Rp 0</span> | Lainnya: <span id="kas-in-lain">Rp 0</span>)</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <div class="text-muted small fw-semibold">Total Pengeluaran Kas Hari Ini</div>
+                <h4 class="fw-bold text-danger mb-0" id="kas-total-out">Rp 0</h4>
+                <small class="text-muted">(Beli Stok: <span id="kas-beli-tunai">Rp 0</span> | Operasional: <span id="kas-ops">Rp 0</span>)</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-success">
+                <div class="text-muted small fw-semibold">Saldo Kas Akhir (Uang Fisik di Laci)</div>
+                <h3 class="fw-bold text-success mb-1" id="kas-saldo-akhir">Rp 0</h3>
+                <small class="text-muted">Rumus: Saldo Awal + Penerimaan Tunai - Pengeluaran Tunai</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-info">
+                <div class="text-muted small fw-semibold">Penerimaan Non-Tunai (QRIS / Transfer)</div>
+                <h3 class="fw-bold text-info mb-1" id="kas-saldo-nontunai">Rp 0</h3>
+                <small class="text-muted">Tersimpan di rekening / dompet digital sekolah</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mutation Actions & Table -->
+          <div class="card border-0 shadow-sm bg-white mb-3">
+            <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+              <div class="d-flex gap-2">
+                <input type="date" id="kas-filter-date" class="form-control" onchange="KasHarian.renderTable()">
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-success" onclick="KasHarian.openModal('in')"><i class="bi bi-plus-circle me-1"></i> Tambah Kas Masuk</button>
+                <button class="btn btn-outline-danger" onclick="KasHarian.openModal('out')"><i class="bi bi-dash-circle me-1"></i> Tambah Kas Keluar</button>
+                <button class="btn btn-outline-secondary" onclick="KasHarian.printReport()"><i class="bi bi-printer me-1"></i> Cetak Laporan Kas</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy">Buku Kas & Riwayat Aliran Kas</h6>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">Waktu</th>
+                      <th>Jenis</th>
+                      <th>Kategori</th>
+                      <th>Deskripsi / Catatan</th>
+                      <th class="text-end">Jumlah Masuk</th>
+                      <th class="text-end">Jumlah Keluar</th>
+                      <th class="text-end pe-3">Saldo Berjalan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="kas-mutasi-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 9. PENGELUARAN OPERASIONAL ==================== -->
+        <section id="view-pengeluaran" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+              <div class="d-flex gap-2 flex-grow-1">
+                <input type="date" id="expense-filter-date" class="form-control w-auto" onchange="Pengeluaran.renderTable()">
+                <select id="expense-filter-cat" class="form-select w-auto" onchange="Pengeluaran.renderTable()">
+                  <option value="">Semua Kategori</option>
+                  <option value="Transportasi belanja">Transportasi belanja</option>
+                  <option value="Biaya plastik">Biaya plastik</option>
+                  <option value="Kebersihan">Kebersihan</option>
+                  <option value="Perlengkapan kantin">Perlengkapan kantin</option>
+                  <option value="Biaya lainnya">Biaya lainnya</option>
+                </select>
+              </div>
+              <button class="btn btn-danger fw-semibold" onclick="Pengeluaran.openModal()"><i class="bi bi-plus-lg me-1"></i> Catat Pengeluaran</button>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold mb-0 text-navy">Daftar Biaya Operasional Kantin</h6>
+              <span class="small text-muted">Pengeluaran ini otomatis menjadi beban di Laporan Laba Rugi</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No</th>
+                      <th>Tanggal</th>
+                      <th>Kategori</th>
+                      <th>Keterangan</th>
+                      <th class="text-center">Metode Pembayaran</th>
+                      <th class="text-end">Jumlah Pengeluaran</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="expense-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                  <tfoot class="table-light fw-bold small">
+                    <tr>
+                      <td colspan="5" class="text-end ps-3">TOTAL PENGELUARAN:</td>
+                      <td class="text-end text-danger" id="expense-total-display">Rp 0</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 10. HUTANG SUPPLIER ==================== -->
+        <section id="view-hutang-supplier" class="app-view d-none">
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Total Seluruh Hutang</small>
+                <h4 class="fw-bold text-dark mb-0" id="hutang-total-all">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Sudah Terbayar</small>
+                <h4 class="fw-bold text-success mb-0" id="hutang-total-paid">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-danger">
+                <small class="text-muted fw-semibold">Sisa Hutang Belum Lunas</small>
+                <h4 class="fw-bold text-danger mb-0" id="hutang-total-rem">Rp 0</h4>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold mb-0 text-navy">Daftar Tagihan & Hutang Supplier (Restock Tempo)</h6>
+              <span class="small text-muted">Sisa hutang dihitung otomatis saat ada pembayaran</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No. Faktur</th>
+                      <th>Nama Supplier</th>
+                      <th>Tgl Jatuh Tempo</th>
+                      <th class="text-end">Total Hutang</th>
+                      <th class="text-end">Sudah Dibayar</th>
+                      <th class="text-end">Sisa Hutang</th>
+                      <th class="text-center">Status</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="hutang-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 11. DATA SUPPLIER ==================== -->
+        <section id="view-supplier" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3 d-flex justify-content-between align-items-center">
+              <input type="text" id="supplier-search" class="form-control w-50" placeholder="Cari nama supplier / distributor..." oninput="Supplier.renderTable()">
+              <button class="btn btn-primary fw-semibold" onclick="Supplier.openModal()"><i class="bi bi-plus-lg me-1"></i> Tambah Supplier</button>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy">Master Data Supplier Minuman & Snack</h6>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No</th>
+                      <th>Nama Supplier / Agen</th>
+                      <th>No. Telepon / WhatsApp</th>
+                      <th>Alamat</th>
+                      <th class="text-end">Sisa Hutang</th>
+                      <th>Catatan</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supplier-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 12. LAPORAN KEUNTUNGAN / LABA RUGI ==================== -->
+        <section id="view-laporan-keuntungan" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold text-muted">Periode</label>
+                  <select id="laba-period-select" class="form-select" onchange="LaporanLaba.handlePeriodChange()">
+                    <option value="hari_ini">Hari Ini</option>
+                    <option value="minggu_ini">Minggu Ini (7 Hari)</option>
+                    <option value="bulan_ini">Bulan Ini</option>
+                    <option value="custom">Pilih Periode Tanggal...</option>
+                  </select>
+                </div>
+                <div class="col-md-3 laba-custom-date d-none">
+                  <label class="form-label small fw-semibold text-muted">Dari Tanggal</label>
+                  <input type="date" id="laba-date-start" class="form-control" onchange="LaporanLaba.loadReport()">
+                </div>
+                <div class="col-md-3 laba-custom-date d-none">
+                  <label class="form-label small fw-semibold text-muted">Sampai Tanggal</label>
+                  <input type="date" id="laba-date-end" class="form-control" onchange="LaporanLaba.loadReport()">
+                </div>
+                <div class="col-md-3 ms-auto text-md-end pt-md-4">
+                  <button class="btn btn-outline-success me-2" onclick="LaporanLaba.exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+                  <button class="btn btn-outline-secondary" onclick="LaporanLaba.printReport()"><i class="bi bi-printer me-1"></i> Cetak</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Laporan Laba Rugi Breakdown Card -->
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <div class="card border-0 shadow-sm bg-white">
+                <div class="card-header bg-navy text-white py-3">
+                  <h6 class="fw-bold mb-0"><i class="bi bi-file-text me-2"></i>Laporan Laba Rugi Operasional Kantin</h6>
+                </div>
+                <div class="card-body p-4">
+                  <table class="table table-borderless align-middle mb-0">
+                    <tbody>
+                      <tr class="border-bottom">
+                        <td class="fw-semibold">1. Total Penjualan (Omzet)</td>
+                        <td class="text-end fw-bold text-blue fs-5" id="lr-omzet">Rp 0</td>
+                      </tr>
+                      <tr class="border-bottom text-muted">
+                        <td class="ps-3">&bull; Modal Barang Terjual (Harga Pokok Penjualan / HPP)</td>
+                        <td class="text-end text-danger" id="lr-hpp">(Rp 0)</td>
+                      </tr>
+                      <tr class="table-light border-bottom">
+                        <td class="fw-bold text-dark">Laba Kotor (Omzet - HPP)</td>
+                        <td class="text-end fw-bold text-success fs-5" id="lr-laba-kotor">Rp 0</td>
+                      </tr>
+                      <tr class="border-bottom text-muted">
+                        <td class="ps-3">&bull; Biaya Operasional (Transport, Plastik, Kebersihan, dll)</td>
+                        <td class="text-end text-danger" id="lr-biaya-ops">(Rp 0)</td>
+                      </tr>
+                      <tr class="bg-success-subtle border-top border-2 border-success">
+                        <td class="fw-bolder fs-5 text-success py-3">LABA BERSIH KANTIN</td>
+                        <td class="text-end fw-bolder fs-4 text-success py-3" id="lr-laba-bersih">Rp 0</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div class="alert alert-info border-0 mt-4 mb-0 small">
+                    <i class="bi bi-info-circle-fill me-1"></i> <b>Catatan Akuntansi:</b> Sesuai standar akuntansi kantin, pembelian stok yang belum terjual tetap tercatat sebagai aset persediaan dan tidak langsung dianggap sebagai beban laba rugi.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profit Summary & Ratio -->
+            <div class="col-lg-4">
+              <div class="card border-0 shadow-sm bg-white p-3 mb-3">
+                <h6 class="fw-bold text-navy mb-3">Margin & Rasio</h6>
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted">Margin Laba Kotor</span>
+                    <span class="fw-bold text-success" id="lr-margin-kotor">0%</span>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div class="progress-bar bg-success" id="lr-progress-kotor" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted">Margin Laba Bersih</span>
+                    <span class="fw-bold text-primary" id="lr-margin-bersih">0%</span>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div class="progress-bar bg-primary" id="lr-progress-bersih" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Card for Closing Day -->
+              <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                <h6 class="fw-bold mb-2"><i class="bi bi-check2-circle me-1"></i> Penutupan Buku Harian</h6>
+                <p class="small text-white-50 mb-3">Hasil perhitungan ini akan otomatis diarsipkan secara permanen saat Anda menekan tombol Tutup Harian di menu Stok Opname.</p>
+                <button class="btn btn-light btn-sm fw-bold text-primary w-100" onclick="App.navigate('stok-opname')">
+                  Buka Menu Stok Opname
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 13. RIWAYAT TRANSAKSI ==================== -->
+        <section id="view-riwayat-transaksi" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-3">
+                  <input type="date" id="history-filter-date" class="form-control" onchange="RiwayatTransaksi.renderTable()">
+                </div>
+                <div class="col-md-3">
+                  <select id="history-filter-status" class="form-select" onchange="RiwayatTransaksi.renderTable()">
+                    <option value="">Semua Status</option>
+                    <option value="selesai">Selesai (Berhasil)</option>
+                    <option value="dibatalkan">Dibatalkan</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <input type="text" id="history-search" class="form-control" placeholder="Cari No. Transaksi..." oninput="RiwayatTransaksi.renderTable()">
+                </div>
+                <div class="col-md-2 text-md-end">
+                  <button class="btn btn-outline-success w-100" onclick="RiwayatTransaksi.exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i> Export</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy">Daftar Seluruh Transaksi Penjualan</h6>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">No. Transaksi</th>
+                      <th>Tanggal & Waktu</th>
+                      <th>Rincian Produk</th>
+                      <th class="text-center">Metode</th>
+                      <th class="text-end">Total Belanja</th>
+                      <th class="text-center">Status</th>
+                      <th class="text-end pe-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 14. LAPORAN BULANAN ==================== -->
+        <section id="view-laporan-bulanan" class="app-view d-none">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+              <div class="d-flex gap-2">
+                <select id="monthly-select-month" class="form-select w-auto" onchange="LaporanBulanan.loadReport()">
+                  <option value="0">Januari</option>
+                  <option value="1">Februari</option>
+                  <option value="2">Maret</option>
+                  <option value="3">April</option>
+                  <option value="4">Mei</option>
+                  <option value="5">Juni</option>
+                  <option value="6">Juli</option>
+                  <option value="7">Agustus</option>
+                  <option value="8">September</option>
+                  <option value="9">Oktober</option>
+                  <option value="10">November</option>
+                  <option value="11">Desember</option>
+                </select>
+                <select id="monthly-select-year" class="form-select w-auto" onchange="LaporanBulanan.loadReport()">
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                </select>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-success" onclick="LaporanBulanan.exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i> Export Excel</button>
+                <button class="btn btn-outline-secondary" onclick="LaporanBulanan.printReport()"><i class="bi bi-printer me-1"></i> Cetak Laporan</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly KPI Highlights -->
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Omzet Bulanan</small>
+                <h4 class="fw-bold text-blue mb-0" id="month-omzet">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Modal Barang (HPP)</small>
+                <h4 class="fw-bold text-secondary mb-0" id="month-hpp">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card border-0 shadow-sm bg-white p-3">
+                <small class="text-muted fw-semibold">Pengeluaran Operasional</small>
+                <h4 class="fw-bold text-danger mb-0" id="month-ops">Rp 0</h4>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-success">
+                <small class="text-muted fw-semibold">Keuntungan Bersih</small>
+                <h4 class="fw-bold text-success mb-0" id="month-laba-bersih">Rp 0</h4>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Chart -->
+          <div class="card border-0 shadow-sm bg-white mb-4">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-graph-up text-primary me-2"></i>Grafik Omzet & Keuntungan Bulanan</h6>
+            </div>
+            <div class="card-body p-3">
+              <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="chart-bulanan"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Day-by-Day Monthly Recap Table -->
+          <div class="card border-0 shadow-sm bg-white">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 text-navy">Rekapitulasi Penjualan Harian Bulan Ini</h6>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light small">
+                    <tr>
+                      <th class="ps-3">Tanggal</th>
+                      <th class="text-center">Trx</th>
+                      <th class="text-center">Barang Terjual</th>
+                      <th class="text-end">Omzet</th>
+                      <th class="text-end">HPP</th>
+                      <th class="text-end">Laba Kotor</th>
+                      <th class="text-end">Pengeluaran</th>
+                      <th class="text-end pe-3">Laba Bersih</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthly-tbody" class="small">
+                    <!-- Injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 15. BACKUP DAN RESTORE DATA ==================== -->
+        <section id="view-backup-restore" class="app-view d-none">
+          <div class="row g-4">
+            <!-- Backup Card -->
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100 bg-white">
+                <div class="card-body p-4 text-center">
+                  <div class="avatar-lg bg-primary-subtle text-primary rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
+                    <i class="bi bi-cloud-arrow-down-fill fs-2"></i>
+                  </div>
+                  <h5 class="fw-bold text-navy mb-2">Cadangkan Seluruh Data (Backup)</h5>
+                  <p class="text-muted small mb-4">
+                    Unduh file arsip lengkap (.json) yang berisi seluruh produk, riwayat transaksi, barang masuk, stok opname, buku kas, hutang, dan laporan keuntungan. Simpan file ini secara berkala ke flashdisk atau Google Drive.
+                  </p>
+                  <button class="btn btn-primary px-4 py-2 fw-semibold shadow-sm" onclick="BackupRestore.downloadBackup()">
+                    <i class="bi bi-download me-2"></i> Unduh File Backup Sekarang
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Restore Card -->
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100 bg-white">
+                <div class="card-body p-4 text-center">
+                  <div class="avatar-lg bg-success-subtle text-success rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
+                    <i class="bi bi-cloud-arrow-up-fill fs-2"></i>
+                  </div>
+                  <h5 class="fw-bold text-navy mb-2">Pulihkan Data (Restore)</h5>
+                  <p class="text-muted small mb-4">
+                    Gunakan file cadangan (.json) sebelumnya untuk memulihkan seluruh data aplikasi saat berganti HP/laptop atau jika terjadi kendala pada peramban web.
+                  </p>
+                  <label class="btn btn-success px-4 py-2 fw-semibold shadow-sm mb-0">
+                    <i class="bi bi-upload me-2"></i> Pilih File Backup & Pulihkan
+                    <input type="file" id="restore-file-input" accept=".json" class="d-none" onchange="BackupRestore.handleRestore(event)">
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clean Trial Transactions Card -->
+            <div class="col-12">
+              <div class="card border-warning-subtle shadow-sm bg-white mb-3">
+                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                  <div>
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-stars text-warning me-2"></i>Bersihkan Riwayat Transaksi Uji Coba Saja (Siap Buka Toko)</h6>
+                    <small class="text-muted">Aksi ini menghapus seluruh nota penjualan uji coba, mutasi kas tes, dan stok opname tes. <b>Seluruh data barang/produk dan harga yang Anda tambahkan tetap tersimpan aman!</b> Stok barang dikembalikan ke stok awal.</small>
+                  </div>
+                  <button class="btn btn-warning fw-bold px-3 text-dark text-nowrap" onclick="BackupRestore.clearTrialTransactions()">
+                    <i class="bi bi-trash3 me-1"></i> Bersihkan Transaksi Tes Saja
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Danger Zone / Factory Reset Card -->
+            <div class="col-12">
+              <div class="card border-danger-subtle shadow-sm bg-white">
+                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                  <div>
+                    <h6 class="fw-bold text-danger mb-1"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Total ke Data Standar SMPN 77 (Kembali ke Awal)</h6>
+                    <small class="text-muted">Aksi ini akan menghapus semua perubahan dan mengisi ulang sistem dengan katalog 24 minuman botol dan snack contoh standar SMPN 77.</small>
+                  </div>
+                  <button class="btn btn-outline-danger fw-semibold text-nowrap" onclick="BackupRestore.resetToDemo()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Data Standar SMPN 77
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 16. PENGATURAN AKUN ==================== -->
+        <section id="view-pengaturan" class="app-view d-none">
+          <div class="row g-4">
+            <!-- Canteen Identity Settings -->
+            <div class="col-lg-6">
+              <div class="card border-0 shadow-sm bg-white h-100">
+                <div class="card-header bg-white py-3 border-bottom">
+                  <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-shop me-2 text-primary"></i>Identitas Usaha & Struk</h6>
+                </div>
+                <div class="card-body p-4">
+                  <form id="form-setting-kantin" onsubmit="Pengaturan.saveCanteenSettings(event)">
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Nama Aplikasi / Usaha</label>
+                      <input type="text" id="set-canteen-name" class="form-control" value="SISTEM KANTIN SMPN 77" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Alamat Sekolah</label>
+                      <input type="text" id="set-canteen-address" class="form-control" value="SMPN 77 Jakarta" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Pesan / Footer Struk Belanja</label>
+                      <textarea id="set-receipt-footer" class="form-control" rows="2">Terima kasih atas kunjungannya!
+Selamat belajar di SMPN 77.</textarea>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Modal Awal Kas Harian Default (Rp)</label>
+                      <input type="number" id="set-initial-cash" class="form-control" value="200000" min="0">
+                      <div class="form-text small">Uang pecahan kecil untuk kembalian di laci kasir setiap pagi.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary fw-semibold px-4">
+                      <i class="bi bi-check-lg me-1"></i> Simpan Identitas
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security & Multi-Role Account Settings -->
+            <div class="col-lg-6">
+              <div class="card border-0 shadow-sm bg-white mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                  <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-shield-lock me-2 text-danger"></i>1. Akun Pengelola / Admin (Akses Penuh)</h6>
+                  <span class="badge bg-danger">Akses 16 Menu</span>
+                </div>
+                <div class="card-body p-4">
+                  <form id="form-setting-admin" onsubmit="Pengaturan.saveAdminSettings(event)">
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Username Admin</label>
+                      <input type="text" id="set-admin-username" class="form-control" value="admin" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">PIN / Sandi Baru Admin</label>
+                      <input type="password" id="set-admin-password" class="form-control" placeholder="Masukkan PIN baru Admin (misal: 123456)" required>
+                      <div class="form-text small">Admin memiliki akses penuh ke Laporan Laba, Kas, Hutang, dan Pengaturan.</div>
+                    </div>
+                    <button type="submit" class="btn btn-danger fw-semibold px-4">
+                      <i class="bi bi-key me-1"></i> Simpan PIN Admin
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Dedicated Cashier Employee Account -->
+              <div class="card border-0 shadow-sm bg-white border-start border-4 border-success">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                  <h6 class="fw-bold mb-0 text-navy"><i class="bi bi-person-badge me-2 text-success"></i>2. Akun Khusus Karyawan Kasir (Akses Terbatas)</h6>
+                  <span class="badge bg-success">Hanya Kasir & Opname</span>
+                </div>
+                <div class="card-body p-4">
+                  <form id="form-setting-kasir" onsubmit="Pengaturan.saveKasirSettings(event)">
+                    <div class="mb-3">
+                      <label class="form-label small fw-semibold text-secondary">Nama Karyawan Kasir</label>
+                      <input type="text" id="set-kasir-name" class="form-control" value="Karyawan Kantin" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                      <div class="col-6">
+                        <label class="form-label small fw-semibold text-secondary">Username Kasir</label>
+                        <input type="text" id="set-kasir-username" class="form-control" value="kasir" required>
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label small fw-semibold text-secondary">PIN Kasir (4 Digit)</label>
+                        <input type="password" id="set-kasir-password" class="form-control" placeholder="Misal: 1234" required>
+                      </div>
+                    </div>
+                    <div class="alert alert-success py-2 small mb-3">
+                      <i class="bi bi-shield-check me-1"></i> <b>Hak Akses Karyawan:</b> Hanya bisa membuka kasir Penjualan, cek stok, dan input Stok Opname. Laporan Keuntungan, Modal HPP, Buku Kas, dan Hapus Data otomatis tersembunyi.
+                    </div>
+                    <button type="submit" class="btn btn-success fw-semibold px-4">
+                      <i class="bi bi-check2-circle me-1"></i> Simpan Akun Karyawan
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div> <!-- /views-wrapper -->
+    </main>
+
+    <!-- Mobile Bottom Navigation (Quick Shortcuts for 1 Employee) -->
+    <nav class="d-md-none mobile-bottom-nav bg-white border-top shadow-lg py-1 px-2 d-flex justify-content-around">
+      <button class="btn btn-nav-mobile active" onclick="App.navigate('dashboard', event)">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span>Dash</span>
+      </button>
+      <button class="btn btn-nav-mobile btn-nav-mobile-pos" onclick="App.navigate('penjualan', event)">
+        <div class="pos-icon-circle shadow">
+          <i class="bi bi-cart-check-fill"></i>
+        </div>
+        <span>Kasir</span>
+      </button>
+      <button class="btn btn-nav-mobile" onclick="App.navigate('stok-opname', event)">
+        <i class="bi bi-clipboard2-check"></i>
+        <span>Opname</span>
+      </button>
+      <button class="btn btn-nav-mobile" onclick="App.navigate('kas-harian', event)">
+        <i class="bi bi-wallet2"></i>
+        <span>Kas</span>
+      </button>
+      <button class="btn btn-nav-mobile" onclick="App.toggleSidebar()">
+        <i class="bi bi-three-dots"></i>
+        <span>Menu</span>
+      </button>
+    </nav>
+  </div> <!-- /app-wrapper -->
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. MODAL PEMBAYARAN KASIR -->
+  <div class="modal fade" id="modal-payment" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-cash-stack me-2"></i>Pembayaran Transaksi</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="text-center mb-3">
+            <span class="text-muted small">Total Tagihan:</span>
+            <h2 class="fw-bold text-primary mb-0" id="pay-total-display">Rp 0</h2>
+          </div>
+
+          <!-- Payment Method: Tunai vs Non-Tunai -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">Metode Pembayaran</label>
+            <div class="row g-2">
+              <div class="col-6">
+                <input type="radio" class="btn-check" name="payment-method" id="pay-method-cash" value="tunai" checked onchange="POS.handleMethodChange()">
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cash">
+                  <i class="bi bi-cash me-1"></i> Tunai (Cash)
+                </label>
+              </div>
+              <div class="col-6">
+                <input type="radio" class="btn-check" name="payment-method" id="pay-method-cashless" value="non-tunai" onchange="POS.handleMethodChange()">
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cashless">
+                  <i class="bi bi-qr-code me-1"></i> Non-Tunai (QRIS)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cash Section -->
+          <div id="cash-payment-fields">
+            <label class="form-label small fw-semibold text-secondary">Uang Diterima (Rp)</label>
+            <div class="input-group input-group-lg mb-2">
+              <span class="input-group-text bg-white">Rp</span>
+              <input type="number" id="pay-cash-given" class="form-control fw-bold fs-4 text-navy" placeholder="0" oninput="POS.calculateChange()">
+            </div>
+
+            <!-- Quick Cash Buttons for High Speed -->
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setExactCash()">Uang Pas</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setCash(5000)">5.000</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setCash(10000)">10.000</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setCash(20000)">20.000</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setCash(50000)">50.000</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="POS.setCash(100000)">100.000</button>
+            </div>
+
+            <!-- Kembalian Alert -->
+            <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+              <span class="fw-semibold text-muted">Kembalian:</span>
+              <h3 class="fw-bold mb-0 text-success" id="pay-change-display">Rp 0</h3>
+            </div>
+          </div>
+
+          <!-- Non-Cash Section -->
+          <div id="cashless-payment-fields" class="d-none text-center p-3 bg-light rounded-3 border">
+            <i class="bi bi-qr-code-scan fs-1 text-primary mb-2 d-block"></i>
+            <p class="small text-muted mb-0">Pembayaran Non-Tunai (QRIS / Rekening Sekolah).<br>Uang otomatis masuk ke akun kas non-tunai tanpa kembalian.</p>
+          </div>
+        </div>
+        <div class="modal-footer bg-light p-3">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-primary fw-bold px-4" id="btn-confirm-payment" onclick="POS.processPayment()">
+            <i class="bi bi-printer me-1"></i> SIMPAN & CETAK STRUK
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MODAL STRUK CETAK THERMAL -->
+  <div class="modal fade" id="modal-receipt" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header py-2 bg-light">
+          <h6 class="modal-title fw-bold text-navy"><i class="bi bi-receipt me-1"></i>Struk Pembelian</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-2">
+          <!-- Thermal Paper Container -->
+          <div id="receipt-content" class="thermal-receipt">
+            <!-- Injected via POS.renderReceipt() -->
+          </div>
+        </div>
+        <div class="modal-footer py-2 bg-light d-flex justify-content-between">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <button type="button" class="btn btn-sm btn-primary fw-semibold" onclick="POS.printReceiptNow()">
+            <i class="bi bi-printer-fill me-1"></i> Cetak Struk
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. MODAL TAMBAH / EDIT PRODUK -->
+  <div class="modal fade" id="modal-product" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold" id="modal-product-title"><i class="bi bi-box-seam me-2"></i>Tambah Produk Baru</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-product" onsubmit="MasterProduk.saveProduct(event)">
+          <input type="hidden" id="prod-id">
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Kode Produk</label>
+                <input type="text" id="prod-code" class="form-control" required placeholder="Contoh: MIN-01">
+              </div>
+              <div class="col-md-8">
+                <label class="form-label small fw-semibold text-secondary">Nama Produk</label>
+                <input type="text" id="prod-name" class="form-control" required placeholder="Contoh: Teh Pucuk Harum 350ml">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Kategori Produk</label>
+                <select id="prod-category" class="form-select" required>
+                  <option value="">Pilih Kategori...</option>
+                  <option value="Air mineral">Air mineral</option>
+                  <option value="Teh kemasan">Teh kemasan</option>
+                  <option value="Minuman rasa buah">Minuman rasa buah</option>
+                  <option value="Susu kemasan">Susu kemasan</option>
+                  <option value="Minuman lainnya">Minuman lainnya</option>
+                  <option value="Keripik">Keripik</option>
+                  <option value="Biskuit">Biskuit</option>
+                  <option value="Wafer">Wafer</option>
+                  <option value="Permen">Permen</option>
+                  <option value="Cokelat">Cokelat</option>
+                  <option value="Snack lainnya">Snack lainnya</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Satuan Barang</label>
+                <select id="prod-unit" class="form-select">
+                  <option value="Botol">Botol</option>
+                  <option value="Pcs">Pcs</option>
+                  <option value="Bungkus">Bungkus</option>
+                  <option value="Cup">Cup</option>
+                  <option value="Kotak">Kotak</option>
+                </select>
+              </div>
+              
+              <!-- Pricing & Margin Auto Calculation -->
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Harga Modal (Rp)</label>
+                <input type="number" id="prod-buy-price" class="form-control" required min="0" oninput="MasterProduk.calculateProfit()">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Harga Jual (Rp)</label>
+                <input type="number" id="prod-sell-price" class="form-control" required min="0" oninput="MasterProduk.calculateProfit()">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Keuntungan / Pcs (Rp)</label>
+                <input type="text" id="prod-profit" class="form-control bg-light fw-bold text-success" readonly value="Rp 0">
+              </div>
+
+              <!-- Stock Setup -->
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary" id="label-prod-stock">Stok Tersedia / Awal</label>
+                <input type="number" id="prod-initial-stock" class="form-control" required min="0" placeholder="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Stok Minimum (Peringatan)</label>
+                <input type="number" id="prod-min-stock" class="form-control" required min="1" value="5">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold text-secondary">Foto Produk (Opsional)</label>
+                <input type="file" id="prod-image-file" class="form-control" accept="image/*" onchange="MasterProduk.previewImage(event)">
+                <input type="hidden" id="prod-image-data">
+              </div>
+              <div class="col-12 text-center" id="prod-image-preview-wrapper" style="display:none;">
+                <img id="prod-image-preview" src="" alt="Preview" class="img-thumbnail" style="max-height: 100px;">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Simpan Produk</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MODAL BARANG MASUK / RESTOCK -->
+  <div class="modal fade" id="modal-restock" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2"></i>Catat Pembelian & Restock Barang</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-restock" onsubmit="BarangMasuk.saveRestock(event)">
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Tanggal Pembelian</label>
+                <input type="date" id="restock-date" class="form-control" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Supplier / Distributor</label>
+                <select id="restock-supplier" class="form-select" required>
+                  <option value="">Pilih Supplier...</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Pilih Produk</label>
+                <select id="restock-product" class="form-select" required onchange="BarangMasuk.handleProductSelect()">
+                  <option value="">Pilih Produk...</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold text-secondary">Jumlah Masuk (Pcs/Botol)</label>
+                <input type="number" id="restock-qty" class="form-control" required min="1" oninput="BarangMasuk.calculateTotal()">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold text-secondary">Harga Modal Satuan (Rp)</label>
+                <input type="number" id="restock-buy-price" class="form-control" required min="0" oninput="BarangMasuk.calculateTotal()">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Metode Pembayaran</label>
+                <select id="restock-payment-method" class="form-select" required onchange="BarangMasuk.handleMethodChange()">
+                  <option value="tunai">Tunai / Kas Langsung</option>
+                  <option value="tempo">Tempo (Hutang Supplier)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold text-secondary">Total Pembelian (Rp)</label>
+                <input type="text" id="restock-total-display" class="form-control bg-light fw-bold text-navy" readonly value="Rp 0">
+              </div>
+              <div class="col-md-6 d-none" id="restock-tempo-fields">
+                <label class="form-label small fw-semibold text-secondary">Tanggal Jatuh Tempo Hutang</label>
+                <input type="date" id="restock-due-date" class="form-control">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label small fw-semibold text-secondary">Keterangan / No. Nota Supplier</label>
+                <input type="text" id="restock-notes" class="form-control" placeholder="Contoh: Nota Toko Grosir Jaya #1029">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Simpan Restock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. MODAL CATAT PENGELUARAN OPERASIONAL -->
+  <div class="modal fade" id="modal-expense" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-dash-circle me-2"></i>Catat Pengeluaran Operasional</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-expense" onsubmit="Pengeluaran.saveExpense(event)">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Tanggal</label>
+              <input type="date" id="exp-date" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Kategori Pengeluaran</label>
+              <select id="exp-category" class="form-select" required>
+                <option value="Transportasi belanja">Transportasi belanja</option>
+                <option value="Biaya plastik">Biaya plastik</option>
+                <option value="Kebersihan">Kebersihan</option>
+                <option value="Perlengkapan kantin">Perlengkapan kantin</option>
+                <option value="Biaya lainnya">Biaya lainnya</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Jumlah Pengeluaran (Rp)</label>
+              <input type="number" id="exp-amount" class="form-control" required min="1" placeholder="Contoh: 15000">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Metode Pembayaran</label>
+              <select id="exp-method" class="form-select">
+                <option value="tunai">Kas Tunai Kantin</option>
+                <option value="non-tunai">Non-Tunai / Bank</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Keterangan Tambahan</label>
+              <input type="text" id="exp-notes" class="form-control" placeholder="Contoh: Beli kantong kresek ukuran sedang">
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-danger fw-semibold px-4">Simpan Pengeluaran</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. MODAL KAS MASUK / KELUAR LAINNYA -->
+  <div class="modal fade" id="modal-kas-manual" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold" id="modal-kas-title"><i class="bi bi-wallet me-2"></i>Entri Mutasi Kas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-kas-manual" onsubmit="KasHarian.saveManualEntry(event)">
+          <input type="hidden" id="kas-manual-type" value="in">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Tanggal</label>
+              <input type="date" id="kas-manual-date" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Jumlah (Rp)</label>
+              <input type="number" id="kas-manual-amount" class="form-control" required min="1" placeholder="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Keterangan / Alasan</label>
+              <input type="text" id="kas-manual-desc" class="form-control" required placeholder="Contoh: Tambahan modal uang kembalian">
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Simpan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. MODAL SUPPLIER TAMBAH / EDIT -->
+  <div class="modal fade" id="modal-supplier" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold" id="modal-supplier-title"><i class="bi bi-people me-2"></i>Data Supplier Baru</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-supplier" onsubmit="Supplier.saveSupplier(event)">
+          <input type="hidden" id="supp-id">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Nama Supplier / Toko Grosir</label>
+              <input type="text" id="supp-name" class="form-control" required placeholder="Contoh: Toko Grosir Berkah 77">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">No. Telepon / HP</label>
+              <input type="text" id="supp-phone" class="form-control" placeholder="08xxxxxxxxxx">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Alamat</label>
+              <textarea id="supp-address" class="form-control" rows="2" placeholder="Alamat lengkap distributor"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Catatan</label>
+              <input type="text" id="supp-notes" class="form-control" placeholder="Jadwal kirim barang, syarat tempo, dll">
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">Simpan Supplier</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. MODAL BAYAR HUTANG SUPPLIER -->
+  <div class="modal fade" id="modal-pay-debt" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-cash me-2"></i>Pembayaran Hutang Supplier</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="form-pay-debt" onsubmit="HutangSupplier.processPayment(event)">
+          <input type="hidden" id="debt-id">
+          <div class="modal-body p-4">
+            <div class="mb-2 text-muted small">Supplier: <b id="debt-modal-supp-name" class="text-dark">-</b></div>
+            <div class="mb-3 text-muted small">Sisa Hutang: <b id="debt-modal-rem-amount" class="text-danger fs-5">Rp 0</b></div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Jumlah yang Dibayarkan (Rp)</label>
+              <input type="number" id="debt-pay-amount" class="form-control" required min="1">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold text-secondary">Sumber Pembayaran</label>
+              <select id="debt-pay-source" class="form-select">
+                <option value="kas">Kas Tunai Kantin (Potong Saldo Kas)</option>
+                <option value="nontunai">Non-Tunai / Rekening</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer bg-light p-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-success fw-semibold px-4">Simpan Pembayaran</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. MODAL DETAIL & BATALKAN TRANSAKSI -->
+  <div class="modal fade" id="modal-trx-detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-navy text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-2"></i>Rincian Transaksi</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4" id="trx-detail-body">
+          <!-- Injected via JS -->
+        </div>
+        <div class="modal-footer bg-light p-3 d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-danger" id="btn-cancel-trx" onclick="RiwayatTransaksi.showCancelPrompt()">
+            <i class="bi bi-x-circle me-1"></i> Batalkan Transaksi
+          </button>
+          <div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            <button type="button" class="btn btn-primary" id="btn-reprint-trx" onclick="RiwayatTransaksi.reprintReceipt()">
+              <i class="bi bi-printer me-1"></i> Cetak Ulang Struk
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External JS Dependencies -->
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- SheetJS (xlsx) for Excel Import & Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- App Core Modules -->
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/db.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "name": "sistem-kantin-smpn77",
+  "version": "1.0.0",
+  "description": "Sistem Manajemen & Kasir Operasional Kantin SMP Negeri 77 Jakarta",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "pos",
+    "kantin",
+    "smpn77",
+    "kasir",
+    "sekolah",
+    "sqlite",
+    "management"
+  ],
+  "author": "Kantin SMPN 77",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
