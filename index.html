@@ -966,6 +966,7 @@
                 <input type="date" id="expense-filter-date" class="form-control w-auto" onchange="Pengeluaran.renderTable()">
                 <select id="expense-filter-cat" class="form-select w-auto" onchange="Pengeluaran.renderTable()">
                   <option value="">Semua Kategori</option>
+                  <option value="Konsumsi Karyawan">Konsumsi Karyawan</option>
                   <option value="Transportasi belanja">Transportasi belanja</option>
                   <option value="Biaya plastik">Biaya plastik</option>
                   <option value="Kebersihan">Kebersihan</option>
@@ -1215,8 +1216,9 @@
                 </div>
                 <div class="col-md-3">
                   <select id="history-filter-status" class="form-select" onchange="RiwayatTransaksi.renderTable()">
-                    <option value="">Semua Status</option>
-                    <option value="selesai">Selesai (Berhasil)</option>
+                    <option value="">Semua Transaksi</option>
+                    <option value="selesai">Penjualan Selesai</option>
+                    <option value="konsumsi">Konsumsi Karyawan (Gratis)</option>
                     <option value="dibatalkan">Dibatalkan</option>
                   </select>
                 </div>
@@ -1572,20 +1574,26 @@ Selamat belajar di SMPN 77.</textarea>
             <h2 class="fw-bold text-primary mb-0" id="pay-total-display">Rp 0</h2>
           </div>
 
-          <!-- Payment Method: Tunai vs Non-Tunai -->
+          <!-- Payment Method: Tunai vs Non-Tunai vs Konsumsi Karyawan -->
           <div class="mb-3">
             <label class="form-label small fw-semibold text-secondary">Metode Pembayaran</label>
             <div class="row g-2">
-              <div class="col-6">
+              <div class="col-4">
                 <input type="radio" class="btn-check" name="payment-method" id="pay-method-cash" value="tunai" checked onchange="POS.handleMethodChange()">
-                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cash">
-                  <i class="bi bi-cash me-1"></i> Tunai (Cash)
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold px-1" for="pay-method-cash">
+                  <i class="bi bi-cash me-1"></i> Tunai
                 </label>
               </div>
-              <div class="col-6">
+              <div class="col-4">
                 <input type="radio" class="btn-check" name="payment-method" id="pay-method-cashless" value="non-tunai" onchange="POS.handleMethodChange()">
-                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cashless">
-                  <i class="bi bi-qr-code me-1"></i> Non-Tunai (QRIS)
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold px-1" for="pay-method-cashless">
+                  <i class="bi bi-qr-code me-1"></i> Non-Tunai
+                </label>
+              </div>
+              <div class="col-4">
+                <input type="radio" class="btn-check" name="payment-method" id="pay-method-konsumsi" value="konsumsi" onchange="POS.handleMethodChange()">
+                <label class="btn btn-outline-warning w-100 py-2 fw-semibold px-1 text-dark" for="pay-method-konsumsi" title="Produk diminum/dikonsumsi karyawan (Rp 0 / Gratis)">
+                  <i class="bi bi-cup-hot-fill me-1 text-warning"></i> Konsumsi
                 </label>
               </div>
             </div>
@@ -1620,6 +1628,25 @@ Selamat belajar di SMPN 77.</textarea>
           <div id="cashless-payment-fields" class="d-none text-center p-3 bg-light rounded-3 border">
             <i class="bi bi-qr-code-scan fs-1 text-primary mb-2 d-block"></i>
             <p class="small text-muted mb-0">Pembayaran Non-Tunai (QRIS / Rekening Sekolah).<br>Uang otomatis masuk ke akun kas non-tunai tanpa kembalian.</p>
+          </div>
+
+          <!-- Konsumsi Karyawan Section -->
+          <div id="konsumsi-payment-fields" class="d-none">
+            <div class="alert alert-warning border-0 p-3 mb-3 d-flex align-items-start gap-2 rounded-3">
+              <i class="bi bi-cup-hot-fill text-warning fs-4 flex-shrink-0"></i>
+              <div class="small">
+                <strong class="text-dark">Konsumsi / Fasilitas Karyawan (Gratis):</strong>
+                <div class="text-muted mt-1">Karyawan tidak membayar (Rp 0). Stok barang akan otomatis berkurang dan dicatat sebagai Beban Pengeluaran Konsumsi sebesar harga modal (HPP).</div>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold text-secondary">Nama Karyawan / Catatan</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-person-badge text-muted"></i></span>
+                <input type="text" id="pay-employee-name" class="form-control" placeholder="Contoh: Pak Budi / Minum Siang" value="Karyawan Kantin">
+              </div>
+              <div class="form-text" style="font-size: 11px;">Akan tercatat di riwayat transaksi dan pembukuan pengeluaran toko.</div>
+            </div>
           </div>
         </div>
         <div class="modal-footer bg-light p-3">
@@ -1828,6 +1855,7 @@ Selamat belajar di SMPN 77.</textarea>
             <div class="mb-3">
               <label class="form-label small fw-semibold text-secondary">Kategori Pengeluaran</label>
               <select id="exp-category" class="form-select" required>
+                <option value="Konsumsi Karyawan">Konsumsi Karyawan</option>
                 <option value="Transportasi belanja">Transportasi belanja</option>
                 <option value="Biaya plastik">Biaya plastik</option>
                 <option value="Kebersihan">Kebersihan</option>
