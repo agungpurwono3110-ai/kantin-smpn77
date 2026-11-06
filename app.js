@@ -325,7 +325,14 @@ const App = {
     await db.setSetting('operational_date', this.operationalDate);
 
     // Update tampilan tanggal di seluruh modul
-    document.querySelectorAll('#sidebar-op-date, #top-date-display, #opname-cur-date').forEach(el => el.textContent = formatDateIndo(this.operationalDate));
+    document.querySelectorAll('#sidebar-op-date, #top-date-display, #opname-cur-date').forEach(el => {
+      el.textContent = formatDateIndo(this.operationalDate);
+      if (this.operationalDate !== today) {
+        el.setAttribute('data-custom-date', 'true');
+      } else {
+        el.removeAttribute('data-custom-date');
+      }
+    });
 
     // Refresh data tampilan aktif
     await this.refreshDashboard();
