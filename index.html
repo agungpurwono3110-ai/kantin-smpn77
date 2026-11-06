@@ -28,10 +28,10 @@
   <div id="login-overlay" class="login-wrapper d-none">
     <div class="card shadow-lg border-0 login-card">
       <div class="card-body p-4 p-md-5 text-center">
-        <div class="brand-logo mb-3">
-          <img src="logo.jpg" alt="Logo Toko Minuman 77" class="rounded-circle shadow mx-auto d-block" style="width: 90px; height: 90px; object-fit: cover; border: 3px solid #ffffff;" onerror="if(!this.triedPng){this.triedPng=true; this.src='logo.png';}else{this.style.display='none'; document.getElementById('login-fallback-icon').style.display='flex';}">
-          <div id="login-fallback-icon" class="logo-icon bg-primary text-white mx-auto shadow" style="display: none;">
-            <i class="bi bi-shop-window"></i>
+        <div class="brand-logo mb-3 d-flex justify-content-center">
+          <div id="login-logo-container" class="rounded-circle shadow d-flex align-items-center justify-content-center overflow-hidden" style="width: 90px; height: 90px; background: #2563eb; border: 3px solid #ffffff;">
+            <i class="bi bi-shop-window text-white fs-1" id="login-fallback-icon"></i>
+            <img id="login-logo-img" src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('login-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'login-fallback-icon')">
           </div>
         </div>
         <h4 class="fw-bold text-navy mb-1">TOKO MINUMAN 77</h4>
@@ -75,8 +75,10 @@
         <i class="bi bi-list fs-4"></i>
       </button>
       <div class="d-flex align-items-center gap-2">
-        <img src="logo.jpg" alt="Logo" class="rounded-circle border border-white" style="width: 32px; height: 32px; object-fit: cover;" onerror="if(!this.triedPng){this.triedPng=true; this.src='logo.png';}else{this.style.display='none'; document.getElementById('mobile-fallback-icon').style.display='inline-block';}">
-        <i class="bi bi-shop fs-5" id="mobile-fallback-icon" style="display: none;"></i>
+        <div class="rounded-circle d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border: 1px solid #ffffff;">
+          <i class="bi bi-shop text-white fs-6" id="mobile-fallback-icon"></i>
+          <img src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('mobile-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'mobile-fallback-icon')">
+        </div>
         <span class="fw-bold">TOKO MINUMAN 77</span>
       </div>
       <div class="dropdown">
@@ -97,9 +99,9 @@
       <!-- Sidebar Brand Header -->
       <div class="sidebar-brand px-3 py-3 border-bottom d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-          <img src="logo.jpg" alt="Logo" class="rounded-circle shadow-sm flex-shrink-0" style="width: 44px; height: 44px; object-fit: cover; border: 2px solid #e2e8f0;" onerror="if(!this.triedPng){this.triedPng=true; this.src='logo.png';}else{this.style.display='none'; document.getElementById('sidebar-fallback-icon').style.display='flex';}">
-          <div id="sidebar-fallback-icon" class="sidebar-logo bg-primary text-white rounded-circle align-items-center justify-content-center shadow-sm flex-shrink-0" style="display: none; width: 44px; height: 44px;">
-            <i class="bi bi-shop-window fs-5"></i>
+          <div class="sidebar-logo-container rounded-circle shadow-sm d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 44px; height: 44px; background: #2563eb; border: 2px solid #e2e8f0;">
+            <i class="bi bi-shop-window text-white fs-5" id="sidebar-fallback-icon"></i>
+            <img src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('sidebar-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'sidebar-fallback-icon')">
           </div>
           <div>
             <h6 class="fw-bold mb-0 text-navy font-title" style="font-size: 0.9rem;">TOKO MINUMAN 77</h6>

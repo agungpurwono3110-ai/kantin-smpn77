@@ -260,6 +260,34 @@ const App = {
     el.type = el.type === 'password' ? 'text' : 'password';
   },
 
+  // Fallback Otomatis untuk Logo Toko (Coba berbagai variasi nama file gambar)
+  tryFallbackLogo(imgEl, fallbackIconId) {
+    const candidates = [
+      'logo.png',
+      'logo.jpeg',
+      'logo.jfif',
+      'logo.webp',
+      'Logo.jpg',
+      'Logo.png',
+      'Logo.jpeg',
+      'assets/img/logo.jpg',
+      'assets/img/logo.png',
+      'assets/img/logo.jpeg'
+    ];
+    imgEl._fallbackIndex = (imgEl._fallbackIndex || 0);
+    if (imgEl._fallbackIndex < candidates.length) {
+      const nextSrc = candidates[imgEl._fallbackIndex++];
+      imgEl.src = nextSrc;
+    } else {
+      // Jika semua nama file tidak ditemukan, sembunyikan gambar dan tampilkan ikon toko default
+      imgEl.classList.add('d-none');
+      if (fallbackIconId) {
+        const icon = document.getElementById(fallbackIconId);
+        if (icon) icon.classList.remove('d-none');
+      }
+    }
+  },
+
   // Jam Digital Real-time di Header
   startLiveClock() {
     function updateClock() {
