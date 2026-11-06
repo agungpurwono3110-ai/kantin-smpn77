@@ -272,7 +272,7 @@ class CanteenDB {
       { key: 'staff_name', value: 'Pengelola Kantin' },
       { key: 'staff_username', value: 'admin' },
       { key: 'staff_password', value: '123456' },
-      { key: 'operational_date', value: new Date().toISOString().split('T')[0] }
+      { key: 'operational_date', value: (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toLocaleDateString('en-CA')) }
     ];
     for (const s of defaultSettings) {
       await this.setSetting(s.key, s.value);

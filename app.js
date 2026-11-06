@@ -22,6 +22,15 @@ function formatDateIndo(dateStr) {
   return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
 }
 
+// Helper untuk mendapatkan tanggal lokal (WIB / jam perangkat pengguna) format YYYY-MM-DD
+function getLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // ==================== APP CONTROLLER ====================
 const App = {
   currentUser: null,
@@ -33,14 +42,19 @@ const App = {
     try {
       await db.init();
       
-      // Load operational date and staff identity
-      this.operationalDate = await db.getSetting('operational_date', new Date().toISOString().split('T')[0]);
+      // Ambil tanggal real-time HARI INI dari jam/kalender perangkat pengguna
+      this.operationalDate = getLocalDateString();
+      await db.setSetting('operational_date', this.operationalDate);
+      
       const staffName = await db.getSetting('staff_name', 'Karyawan Kantin');
       const canteenName = await db.getSetting('canteen_name', 'SISTEM KANTIN SMPN 77');
 
       // Update UI Header & Titles
       document.querySelectorAll('#user-display-name, #user-display-mobile').forEach(el => el.textContent = staffName);
       document.querySelectorAll('#sidebar-op-date, #top-date-display, #opname-cur-date').forEach(el => el.textContent = formatDateIndo(this.operationalDate));
+      
+      // Jalankan jam real-time digital di header
+      this.startLiveClock();
       
       // Check authentication session
       const authSession = sessionStorage.getItem('kantin77_auth');
@@ -244,6 +258,73 @@ const App = {
   togglePasswordVisibility(inputId) {
     const el = document.getElementById(inputId);
     el.type = el.type === 'password' ? 'text' : 'password';
+  },
+
+  // Jam Digital Real-time di Header
+  startLiveClock() {
+    function updateClock() {
+      const el = document.getElementById('live-time-display');
+      if (el) {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        el.textContent = `${h}:${m}:${s} WIB`;
+      }
+    }
+    updateClock();
+    if (!this._clockInterval) {
+      this._clockInterval = setInterval(updateClock, 1000);
+    }
+  },
+
+  // Fitur Ganti Tanggal Operasional (Bisa pilih tanggal mana pun atau kembali ke Hari Ini)
+  async changeOperationalDate() {
+    const today = getLocalDateString();
+    const newDate = prompt(
+      `PENGATURAN TANGGAL OPERASIONAL KANTIN\n\nTanggal aktif saat ini: ${this.operationalDate}\nTanggal asli hari ini: ${today}\n\nMasukkan tanggal (format: YYYY-MM-DD, contoh: ${today}) atau kosongkan untuk kembali ke HARI INI:`,
+      this.operationalDate
+    );
+    if (newDate === null) return; // Batal
+
+    const targetDate = newDate.trim() || today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      alert('Format tanggal salah! Gunakan format TAHUN-BULAN-TANGGAL (contoh: ' + today + ').');
+      return;
+    }
+
+    this.operationalDate = targetDate;
+    await db.setSetting('operational_date', this.operationalDate);
+
+    // Update tampilan tanggal di seluruh modul
+    document.querySelectorAll('#sidebar-op-date, #top-date-display, #opname-cur-date').forEach(el => el.textContent = formatDateIndo(this.operationalDate));
+
+    // Refresh data tampilan aktif
+    await this.refreshDashboard();
+    if (this.activeView === 'penjualan') await POS.renderProducts();
+    if (this.activeView === 'rekap-penjualan') {
+      const el = document.getElementById('rekap-filter-date');
+      if (el) el.value = this.operationalDate;
+      await Rekap.loadRekap();
+    }
+    if (this.activeView === 'stok-opname') await StokOpname.loadOpnameTable();
+    if (this.activeView === 'kas-harian') {
+      const el = document.getElementById('kas-filter-date');
+      if (el) el.value = this.operationalDate;
+      await KasHarian.renderTable();
+    }
+    if (this.activeView === 'pengeluaran') {
+      const el = document.getElementById('expense-filter-date');
+      if (el) el.value = this.operationalDate;
+      await Pengeluaran.renderTable();
+    }
+    if (this.activeView === 'riwayat-transaksi') {
+      const el = document.getElementById('history-filter-date');
+      if (el) el.value = this.operationalDate;
+      await RiwayatTransaksi.renderTable();
+    }
+
+    alert(`Tanggal operasional berhasil disetel ke:\n${formatDateIndo(this.operationalDate)}`);
   },
 
   // Dashboard Refresh Logic
@@ -3222,6 +3303,8 @@ const Pengaturan = {
 };
 
 // Start application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { App.init(); });
+} else {
   App.init();
-});
+}
