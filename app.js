@@ -1094,6 +1094,7 @@ const POS = {
 
     container.innerHTML = `
       <div class="text-center mb-2">
+        <img src="logo.jpg" alt="Logo" class="rounded-circle mb-1" style="width: 44px; height: 44px; object-fit: cover;" onerror="if(!this.triedPng){this.triedPng=true; this.src='logo.png';}else{this.style.display='none';}">
         <h6 class="fw-bold mb-0 text-uppercase">${canteenName}</h6>
         <div style="font-size: 11px;">${schoolAddress}</div>
         <div style="font-size: 10px;">Telp/WA: 0812-9876-5432</div>
