@@ -26,17 +26,21 @@ const API = {
   },
 
   updateConnectionBadge(online) {
+    if (window.CloudDB && window.CloudDB.isOnline) return;
+
     const badge = document.getElementById('badge-connection-status');
     if (!badge) return;
 
     if (online) {
       badge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold';
-      badge.innerHTML = '<i class="bi bi-database-check me-1"></i> SQLite Terpusat (Online)';
+      badge.innerHTML = '<i class="bi bi-database-check me-1"></i> Server Terpusat (Online)';
       badge.title = 'Terhubung ke server database. Seluruh transaksi tersimpan di server terpusat.';
     } else {
-      badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small fw-semibold';
-      badge.innerHTML = '<i class="bi bi-hdd-network me-1"></i> Mode Offline (Lokal)';
-      badge.title = 'Berjalan di penyimpanan lokal browser perangkat ini.';
+      if (!window.CloudDB || !window.CloudDB.isOnline) {
+        badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small fw-semibold';
+        badge.innerHTML = '<i class="bi bi-hdd-network me-1"></i> Mode Offline (Lokal)';
+        badge.title = 'Berjalan di penyimpanan lokal browser perangkat ini.';
+      }
     }
   },
 

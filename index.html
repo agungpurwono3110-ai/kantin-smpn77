@@ -2030,6 +2030,8 @@ Selamat belajar di SMPN 77.</textarea>
   </div>
 
   <!-- External JS Dependencies -->
+  <!-- Supabase Cloud Database Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Bootstrap 5 JS Bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <!-- Chart.js -->
@@ -2066,7 +2068,7 @@ Selamat belajar di SMPN 77.</textarea>
   <script>
     (function() {
       const ver = Date.now();
-      const modules = ['api.js', 'db.js', 'app.js'];
+      const modules = ['supabase.js', 'api.js', 'db.js', 'app.js'];
       function loadSequential(index, tryRoot) {
         if (index >= modules.length) return;
         const name = modules[index];
