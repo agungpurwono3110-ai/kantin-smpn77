@@ -92,13 +92,6 @@ class CanteenDB {
         this.db = event.target.result;
         // Check if database is empty; if so, populate with initial canteen demo data
         await this.checkAndSeedDefaultData();
-        
-        // Inisialisasi CloudDB Supabase & Sync Otomatis
-        if (window.CloudDB) {
-          window.CloudDB.init();
-          await window.CloudDB.initialSyncFromLocal();
-        }
-
         resolve(this.db);
       };
 
@@ -115,21 +108,8 @@ class CanteenDB {
     return transaction.objectStore(storeName);
   }
 
-  // Get all records from a store (Otomatis dari Cloud jika Online, dengan fallback Lokal)
+  // Get all records from a store
   async getAll(storeName) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        const { data, error } = await window.CloudDB.client.from(storeName).select('*').order('id', { ascending: true });
-        if (!error && Array.isArray(data) && data.length > 0) {
-          for (const item of data) {
-            await this.putLocal(storeName, item);
-          }
-          return data;
-        }
-      } catch (e) {
-        console.warn(`CloudDB getAll failed for ${storeName}:`, e);
-      }
-    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readonly');
       const req = store.getAll();
@@ -138,27 +118,8 @@ class CanteenDB {
     });
   }
 
-  putLocal(storeName, data) {
-    return new Promise((resolve) => {
-      try {
-        const store = this.tx(storeName, 'readwrite');
-        const req = store.put(data);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-      } catch (e) {
-        resolve(null);
-      }
-    });
-  }
-
   // Get record by ID
   async get(storeName, id) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        const { data, error } = await window.CloudDB.client.from(storeName).select('*').eq('id', id).maybeSingle();
-        if (!error && data) return data;
-      } catch (e) {}
-    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readonly');
       const req = store.get(id);
@@ -169,19 +130,6 @@ class CanteenDB {
 
   // Add record
   async add(storeName, data) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        const payload = { ...data };
-        delete payload.id;
-        const { data: inserted, error } = await window.CloudDB.client.from(storeName).insert(payload).select().single();
-        if (!error && inserted) {
-          await this.putLocal(storeName, inserted);
-          return inserted.id;
-        }
-      } catch (e) {
-        console.warn(`CloudDB add failed for ${storeName}:`, e);
-      }
-    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readwrite');
       const req = store.add(data);
@@ -192,25 +140,16 @@ class CanteenDB {
 
   // Put (update or create) record
   async put(storeName, data) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client && data.id) {
-      try {
-        await window.CloudDB.client.from(storeName).upsert(data);
-      } catch (e) {
-        console.warn(`CloudDB put failed for ${storeName}:`, e);
-      }
-    }
-    return this.putLocal(storeName, data);
+    return new Promise((resolve, reject) => {
+      const store = this.tx(storeName, 'readwrite');
+      const req = store.put(data);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
   }
 
   // Delete record by ID
   async delete(storeName, id) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        await window.CloudDB.client.from(storeName).delete().eq('id', id);
-      } catch (e) {
-        console.warn(`CloudDB delete failed for ${storeName}:`, e);
-      }
-    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readwrite');
       const req = store.delete(id);
@@ -231,14 +170,6 @@ class CanteenDB {
 
   // Settings: get value by key
   async getSetting(key, defaultValue = null) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        const { data, error } = await window.CloudDB.client.from('settings').select('value').eq('key', key).maybeSingle();
-        if (!error && data && data.value !== undefined) {
-          return data.value;
-        }
-      } catch (e) {}
-    }
     return new Promise((resolve) => {
       const store = this.tx('settings', 'readonly');
       const req = store.get(key);
@@ -255,11 +186,6 @@ class CanteenDB {
 
   // Settings: set value
   async setSetting(key, value) {
-    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
-      try {
-        await window.CloudDB.client.from('settings').upsert({ key, value: String(value), updated_at: new Date().toISOString() });
-      } catch (e) {}
-    }
     return this.put('settings', { key, value, updated_at: new Date().toISOString() });
   }
 
@@ -346,7 +272,7 @@ class CanteenDB {
       { key: 'staff_name', value: 'Pengelola Kantin' },
       { key: 'staff_username', value: 'admin' },
       { key: 'staff_password', value: '123456' },
-      { key: 'operational_date', value: (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toLocaleDateString('en-CA')) }
+      { key: 'operational_date', value: new Date().toISOString().split('T')[0] }
     ];
     for (const s of defaultSettings) {
       await this.setSetting(s.key, s.value);
