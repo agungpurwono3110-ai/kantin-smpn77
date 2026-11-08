@@ -6,8 +6,7 @@
   <title>SISTEM KANTIN SMPN 77 - Manajemen & Kasir Profesional</title>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/jpeg" href="logo.jpg">
-  <link rel="alternate icon" href="logo.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>">
 
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -18,9 +17,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Custom CSS (Support assets/css/ and root) -->
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-light">
 
@@ -28,14 +26,13 @@
   <div id="login-overlay" class="login-wrapper d-none">
     <div class="card shadow-lg border-0 login-card">
       <div class="card-body p-4 p-md-5 text-center">
-        <div class="brand-logo mb-3 d-flex justify-content-center">
-          <div id="login-logo-container" class="rounded-circle shadow d-flex align-items-center justify-content-center overflow-hidden" style="width: 90px; height: 90px; background: #2563eb; border: 3px solid #ffffff;">
-            <i class="bi bi-shop-window text-white fs-1" id="login-fallback-icon"></i>
-            <img id="login-logo-img" src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('login-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'login-fallback-icon')">
+        <div class="brand-logo mb-3">
+          <div class="logo-icon bg-primary text-white mx-auto shadow">
+            <i class="bi bi-shop-window"></i>
           </div>
         </div>
-        <h4 class="fw-bold text-navy mb-1">TOKO MINUMAN 77</h4>
-        <p class="text-muted small mb-4">Sistem Manajemen & Kasir Operasional Kantin SMPN 77</p>
+        <h4 class="fw-bold text-navy mb-1">KANTIN SMPN 77</h4>
+        <p class="text-muted small mb-4">Sistem Manajemen & Kasir Operasional</p>
 
         <form id="form-login" onsubmit="App.handleLogin(event)">
           <div class="mb-3 text-start">
@@ -75,11 +72,11 @@
         <i class="bi bi-list fs-4"></i>
       </button>
       <div class="d-flex align-items-center gap-2">
-        <div class="rounded-circle d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 32px; height: 32px; background: rgba(255,255,255,0.2); border: 1px solid #ffffff;">
-          <i class="bi bi-shop text-white fs-6" id="mobile-fallback-icon"></i>
-          <img src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('mobile-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'mobile-fallback-icon')">
-        </div>
-        <span class="fw-bold">TOKO MINUMAN 77</span>
+        <i class="bi bi-shop fs-5"></i>
+        <span class="fw-bold">KANTIN SMPN 77</span>
+        <span id="mobile-cloud-badge" class="badge bg-success-subtle text-white border border-light-subtle px-2 py-1" style="font-size: 10px;">
+          <i class="bi bi-cloud-check-fill"></i> Cloud
+        </span>
       </div>
       <div class="dropdown">
         <button class="btn btn-sm btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
@@ -99,22 +96,21 @@
       <!-- Sidebar Brand Header -->
       <div class="sidebar-brand px-3 py-3 border-bottom d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-          <div class="sidebar-logo-container rounded-circle shadow-sm d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0" style="width: 44px; height: 44px; background: #2563eb; border: 2px solid #e2e8f0;">
-            <i class="bi bi-shop-window text-white fs-5" id="sidebar-fallback-icon"></i>
-            <img src="logo.jpg" alt="" class="w-100 h-100 object-fit-cover d-none" onload="this.classList.remove('d-none'); document.getElementById('sidebar-fallback-icon').classList.add('d-none');" onerror="App.tryFallbackLogo(this, 'sidebar-fallback-icon')">
+          <div class="sidebar-logo bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm">
+            <i class="bi bi-shop-window fs-5"></i>
           </div>
           <div>
-            <h6 class="fw-bold mb-0 text-navy font-title" style="font-size: 0.9rem;">TOKO MINUMAN 77</h6>
-            <small class="text-muted" style="font-size: 11px;">Kantin SMPN 77</small>
+            <h6 class="fw-bold mb-0 text-navy font-title">KANTIN SMPN 77</h6>
+            <small class="text-muted" style="font-size: 11px;">Sistem Manajemen Kasir</small>
           </div>
         </div>
         <button class="btn-close d-md-none" onclick="App.toggleSidebar()"></button>
       </div>
 
       <!-- Quick Operational Info Badge -->
-      <div class="px-3 py-2 bg-light-subtle border-bottom small text-muted d-flex justify-content-between align-items-center" style="cursor: pointer;" title="Klik untuk ganti tanggal operasional / kembali ke Hari Ini" onclick="App.changeOperationalDate()">
+      <div class="px-3 py-2 bg-light-subtle border-bottom small text-muted d-flex justify-content-between align-items-center">
         <span><i class="bi bi-calendar-event me-1 text-primary"></i> <b id="sidebar-op-date">-</b></span>
-        <span class="badge bg-success-subtle text-success border border-success-subtle" id="badge-operasional-status"><i class="bi bi-clock-history me-1"></i>Aktif</span>
+        <span class="badge bg-success-subtle text-success border border-success-subtle" id="badge-operasional-status">Aktif</span>
       </div>
 
       <!-- Sidebar Menu List (16 Menus) -->
@@ -245,14 +241,10 @@
       
       <!-- Top Bar for Desktop -->
       <div class="d-none d-md-flex align-items-center justify-content-between mb-4 bg-white p-3 rounded-3 shadow-sm border">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
           <h5 class="fw-bold mb-0 text-navy" id="page-title"><i class="bi bi-grid-1x2-fill me-2 text-primary"></i> Dashboard Utama</h5>
-          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" id="top-op-badge" style="cursor: pointer;" title="Klik untuk ubah tanggal operasional atau kembali ke Hari Ini" onclick="App.changeOperationalDate()">
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" id="top-op-badge">
             <i class="bi bi-calendar-check me-1"></i> <span id="top-date-display">-</span>
-            <i class="bi bi-pencil-fill ms-1 opacity-75" style="font-size: 10px;"></i>
-          </span>
-          <span class="badge bg-light text-dark border px-2 py-1 small fw-semibold" id="top-live-clock" title="Waktu Nyata Lokal">
-            <i class="bi bi-clock me-1 text-primary"></i> <span id="live-time-display">--:--:-- WIB</span>
           </span>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -977,7 +969,6 @@
                 <input type="date" id="expense-filter-date" class="form-control w-auto" onchange="Pengeluaran.renderTable()">
                 <select id="expense-filter-cat" class="form-select w-auto" onchange="Pengeluaran.renderTable()">
                   <option value="">Semua Kategori</option>
-                  <option value="Konsumsi Karyawan">Konsumsi Karyawan</option>
                   <option value="Transportasi belanja">Transportasi belanja</option>
                   <option value="Biaya plastik">Biaya plastik</option>
                   <option value="Kebersihan">Kebersihan</option>
@@ -1227,9 +1218,8 @@
                 </div>
                 <div class="col-md-3">
                   <select id="history-filter-status" class="form-select" onchange="RiwayatTransaksi.renderTable()">
-                    <option value="">Semua Transaksi</option>
-                    <option value="selesai">Penjualan Selesai</option>
-                    <option value="konsumsi">Konsumsi Karyawan (Gratis)</option>
+                    <option value="">Semua Status</option>
+                    <option value="selesai">Selesai (Berhasil)</option>
                     <option value="dibatalkan">Dibatalkan</option>
                   </select>
                 </div>
@@ -1585,26 +1575,20 @@ Selamat belajar di SMPN 77.</textarea>
             <h2 class="fw-bold text-primary mb-0" id="pay-total-display">Rp 0</h2>
           </div>
 
-          <!-- Payment Method: Tunai vs Non-Tunai vs Konsumsi Karyawan -->
+          <!-- Payment Method: Tunai vs Non-Tunai -->
           <div class="mb-3">
             <label class="form-label small fw-semibold text-secondary">Metode Pembayaran</label>
             <div class="row g-2">
-              <div class="col-4">
+              <div class="col-6">
                 <input type="radio" class="btn-check" name="payment-method" id="pay-method-cash" value="tunai" checked onchange="POS.handleMethodChange()">
-                <label class="btn btn-outline-primary w-100 py-2 fw-semibold px-1" for="pay-method-cash">
-                  <i class="bi bi-cash me-1"></i> Tunai
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cash">
+                  <i class="bi bi-cash me-1"></i> Tunai (Cash)
                 </label>
               </div>
-              <div class="col-4">
+              <div class="col-6">
                 <input type="radio" class="btn-check" name="payment-method" id="pay-method-cashless" value="non-tunai" onchange="POS.handleMethodChange()">
-                <label class="btn btn-outline-primary w-100 py-2 fw-semibold px-1" for="pay-method-cashless">
-                  <i class="bi bi-qr-code me-1"></i> Non-Tunai
-                </label>
-              </div>
-              <div class="col-4">
-                <input type="radio" class="btn-check" name="payment-method" id="pay-method-konsumsi" value="konsumsi" onchange="POS.handleMethodChange()">
-                <label class="btn btn-outline-warning w-100 py-2 fw-semibold px-1 text-dark" for="pay-method-konsumsi" title="Produk diminum/dikonsumsi karyawan (Rp 0 / Gratis)">
-                  <i class="bi bi-cup-hot-fill me-1 text-warning"></i> Konsumsi
+                <label class="btn btn-outline-primary w-100 py-2 fw-semibold" for="pay-method-cashless">
+                  <i class="bi bi-qr-code me-1"></i> Non-Tunai (QRIS)
                 </label>
               </div>
             </div>
@@ -1639,25 +1623,6 @@ Selamat belajar di SMPN 77.</textarea>
           <div id="cashless-payment-fields" class="d-none text-center p-3 bg-light rounded-3 border">
             <i class="bi bi-qr-code-scan fs-1 text-primary mb-2 d-block"></i>
             <p class="small text-muted mb-0">Pembayaran Non-Tunai (QRIS / Rekening Sekolah).<br>Uang otomatis masuk ke akun kas non-tunai tanpa kembalian.</p>
-          </div>
-
-          <!-- Konsumsi Karyawan Section -->
-          <div id="konsumsi-payment-fields" class="d-none">
-            <div class="alert alert-warning border-0 p-3 mb-3 d-flex align-items-start gap-2 rounded-3">
-              <i class="bi bi-cup-hot-fill text-warning fs-4 flex-shrink-0"></i>
-              <div class="small">
-                <strong class="text-dark">Konsumsi / Fasilitas Karyawan (Gratis):</strong>
-                <div class="text-muted mt-1">Karyawan tidak membayar (Rp 0). Stok barang akan otomatis berkurang dan dicatat sebagai Beban Pengeluaran Konsumsi sebesar harga modal (HPP).</div>
-              </div>
-            </div>
-            <div class="mb-2">
-              <label class="form-label small fw-semibold text-secondary">Nama Karyawan / Catatan</label>
-              <div class="input-group">
-                <span class="input-group-text bg-white"><i class="bi bi-person-badge text-muted"></i></span>
-                <input type="text" id="pay-employee-name" class="form-control" placeholder="Contoh: Pak Budi / Minum Siang" value="Karyawan Kantin">
-              </div>
-              <div class="form-text" style="font-size: 11px;">Akan tercatat di riwayat transaksi dan pembukuan pengeluaran toko.</div>
-            </div>
           </div>
         </div>
         <div class="modal-footer bg-light p-3">
@@ -1866,7 +1831,6 @@ Selamat belajar di SMPN 77.</textarea>
             <div class="mb-3">
               <label class="form-label small fw-semibold text-secondary">Kategori Pengeluaran</label>
               <select id="exp-category" class="form-select" required>
-                <option value="Konsumsi Karyawan">Konsumsi Karyawan</option>
                 <option value="Transportasi belanja">Transportasi belanja</option>
                 <option value="Biaya plastik">Biaya plastik</option>
                 <option value="Kebersihan">Kebersihan</option>
@@ -2030,8 +1994,6 @@ Selamat belajar di SMPN 77.</textarea>
   </div>
 
   <!-- External JS Dependencies -->
-  <!-- Supabase Cloud Database Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Bootstrap 5 JS Bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <!-- Chart.js -->
@@ -2039,55 +2001,34 @@ Selamat belajar di SMPN 77.</textarea>
   <!-- SheetJS (xlsx) for Excel Import & Export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Instant Real-Time Clock & Local Date Runner -->
+  <!-- Google Firebase Cloud Database SDK (Real-Time Cloud Sync) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script>
-    (function() {
-      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-      function updateLiveTimeAndDate() {
-        const now = new Date();
-        const h = String(now.getHours()).padStart(2, '0');
-        const m = String(now.getMinutes()).padStart(2, '0');
-        const s = String(now.getSeconds()).padStart(2, '0');
-        const clockEl = document.getElementById('live-time-display');
-        if (clockEl) clockEl.textContent = `${h}:${m}:${s} WIB`;
-
-        // Update tampilan tanggal real-time jika belum diubah khusus oleh pengguna
-        const todayText = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-        document.querySelectorAll('#sidebar-op-date, #top-date-display').forEach(el => {
-          if (!el.getAttribute('data-custom-date')) {
-            el.textContent = todayText;
-          }
-        });
+    const firebaseConfig = {
+      apiKey: "AIzaSyAF2q99LH9PaLefvFj2sRUDGk4ihVpvMdg",
+      authDomain: "kantin-smpn77.firebaseapp.com",
+      projectId: "kantin-smpn77",
+      storageBucket: "kantin-smpn77.firebasestorage.app",
+      messagingSenderId: "731484508072",
+      appId: "1:731484508072:web:c38492591d8907a094d79d",
+      measurementId: "G-D4BS5H8DVE"
+    };
+    try {
+      if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        window.firestoreDb = firebase.firestore();
+        console.log('🔥 Firebase Cloud Database berhasil aktif!');
       }
-      updateLiveTimeAndDate();
-      setInterval(updateLiveTimeAndDate, 1000);
-    })();
+    } catch(e) {
+      console.warn('Firebase init error:', e);
+    }
   </script>
+  <script src="assets/js/firebase-config.js" onerror="this.onerror=null;this.src='firebase-config.js';"></script>
 
-  <!-- App Core Modules (Prioritaskan Root Sesuai Lokasi Upload GitHub + Anti-Cache) -->
-  <script>
-    (function() {
-      const ver = Date.now();
-      const modules = ['supabase.js', 'api.js', 'db.js', 'app.js'];
-      function loadSequential(index, tryRoot) {
-        if (index >= modules.length) return;
-        const name = modules[index];
-        const s = document.createElement('script');
-        // Prioritaskan muat langsung dari root (tempat file diunggah di GitHub)
-        s.src = (tryRoot ? name : ('assets/js/' + name)) + '?v=' + ver;
-        s.onload = function() { loadSequential(index + 1, tryRoot); };
-        s.onerror = function() {
-          if (tryRoot) {
-            // Jika tidak ditemukan di root, fallback cari di assets/js/
-            loadSequential(index, false);
-          } else {
-            console.error('Gagal memuat modul:', name);
-          }
-        };
-        document.body.appendChild(s);
-      }
-      loadSequential(0, true);
-    })();
-  </script>
+  <!-- App Core Modules (with root fallback if uploaded to root on GitHub) -->
+  <script src="assets/js/api.js" onerror="this.onerror=null;this.src='api.js';"></script>
+  <script src="assets/js/db.js" onerror="this.onerror=null;this.src='db.js';"></script>
+  <script src="assets/js/app.js" onerror="this.onerror=null;this.src='app.js';"></script>
 </body>
 </html>
