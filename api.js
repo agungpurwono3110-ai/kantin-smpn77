@@ -25,35 +25,20 @@ const API = {
     return false;
   },
 
-  updateConnectionBadge(online, mode = 'sqlite') {
+  updateConnectionBadge(online) {
+    if (window.location.hostname.includes('github.io') || window.CloudDB) return;
+
     const badge = document.getElementById('badge-connection-status');
-    const mobileBadge = document.getElementById('mobile-cloud-badge');
     if (!badge) return;
 
-    if (online || (window.db && window.db.isCloud)) {
-      if (mode === 'cloud' || (window.db && window.db.isCloud)) {
-        badge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold';
-        badge.innerHTML = '<i class="bi bi-cloud-check-fill me-1"></i> Cloud Database (Online Real-Time)';
-        badge.title = 'Terhubung ke Google Firebase Cloud. Seluruh transaksi tersinkronisasi otomatis antar-perangkat.';
-        if (mobileBadge) {
-          mobileBadge.className = 'badge bg-success-subtle text-white border border-light-subtle px-2 py-1';
-          mobileBadge.innerHTML = '<i class="bi bi-cloud-check-fill"></i> Cloud';
-          mobileBadge.style.display = 'inline-block';
-        }
-      } else {
-        badge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold';
-        badge.innerHTML = '<i class="bi bi-database-check me-1"></i> SQLite Terpusat (Online)';
-        badge.title = 'Terhubung ke server database. Seluruh transaksi tersimpan di server terpusat.';
-      }
+    if (online) {
+      badge.className = 'badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold';
+      badge.innerHTML = '<i class="bi bi-database-check me-1"></i> Server Terpusat (Online)';
+      badge.title = 'Terhubung ke server database. Seluruh transaksi tersimpan di server terpusat.';
     } else {
-      if (window.db && window.db.isCloud) return;
       badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 small fw-semibold';
       badge.innerHTML = '<i class="bi bi-hdd-network me-1"></i> Mode Offline (Lokal)';
       badge.title = 'Berjalan di penyimpanan lokal browser perangkat ini.';
-      if (mobileBadge) {
-        mobileBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1';
-        mobileBadge.innerHTML = '<i class="bi bi-hdd"></i> Lokal';
-      }
     }
   },
 

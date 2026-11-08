@@ -1,111 +1,255 @@
 /**
- * SISTEM KANTIN SMPN 77 - DATABASE LAYER (IndexedDB + Google Firebase Cloud Firestore)
- * 100% Real-time synchronization across devices (Laptop, HP, Tablet) via Firebase Cloud,
- * with automatic IndexedDB offline persistence and seamless failover.
+ * SISTEM KANTIN SMPN 77 - DATABASE LAYER (IndexedDB)
+ * 100% Client-side persistent storage, reliable, transactional, multi-megabyte capacity.
  */
 
 const DB_NAME = 'KantinSMPN77_DB';
 const DB_VERSION = 1;
 
-// Helper to remove 'undefined' fields before sending to Firestore
-function sanitizeForFirestore(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  const clean = Array.isArray(obj) ? [] : {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined) {
-      clean[k] = null;
-    } else if (v && typeof v === 'object' && !(v instanceof Date)) {
-      clean[k] = sanitizeForFirestore(v);
+// ==================== SUPABASE CLOUD DATABASE ADAPTER ====================
+const SUPABASE_CONFIG = {
+  url: 'https://tbapbfcgvlbtzcfsacru.supabase.co',
+  key: 'sb_publishable_rdR2danAo3TKj5uQzmtvmg_T3zQOOnr'
+};
+
+const CloudDB = {
+  client: null,
+  isOnline: false,
+  lastError: null,
+  retryCount: 0,
+
+  async init() {
+    const sb = window.supabase || (typeof supabase !== 'undefined' ? supabase : null);
+    if (!sb || typeof sb.createClient !== 'function') {
+      if (this.retryCount < 5) {
+        this.retryCount++;
+        console.warn(`Library Supabase belum siap, mencoba ulang (${this.retryCount}/5)...`);
+        setTimeout(() => this.init(), 600);
+      } else {
+        this.lastError = 'Library Supabase gagal dimuat. Pastikan index.html versi terbaru sudah diunggah ke GitHub.';
+        this.updateStatusBadge(false, this.lastError);
+      }
+      return false;
+    }
+
+    try {
+      if (!this.client) {
+        this.client = sb.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+      }
+
+      // Tes koneksi langsung dengan query ke tabel products
+      const { data, error } = await this.client.from('products').select('id').limit(1);
+      
+      if (error) {
+        console.warn('Uji coba koneksi Supabase gagal:', error.message);
+        this.lastError = error.message;
+        this.isOnline = false;
+        this.updateStatusBadge(false, error.message);
+        return false;
+      }
+
+      this.isOnline = true;
+      this.lastError = null;
+      this.updateStatusBadge(true);
+      console.log('🟢 Sukses terhubung ke Supabase Cloud Database!');
+      this.setupRealtimeListeners();
+      return true;
+    } catch (err) {
+      console.error('Gagal menghubungkan Supabase:', err);
+      this.lastError = err.message;
+      this.isOnline = false;
+      this.updateStatusBadge(false, err.message);
+      return false;
+    }
+  },
+
+  updateStatusBadge(online, errorMsg = '') {
+    const badge = document.getElementById('badge-connection-status');
+    if (!badge) return;
+    badge.style.cursor = 'pointer';
+
+    if (online) {
+      badge.className = 'badge bg-success text-white border border-success px-2 py-1 small fw-semibold shadow-sm';
+      badge.innerHTML = '<i class="bi bi-cloud-check-fill me-1"></i> Cloud Database (Online)';
+      badge.title = 'Terhubung ke Database Cloud Supabase! Data tersinkron otomatis antar HP & Komputer. Klik untuk rincian.';
+      badge.onclick = () => CloudDB.showDiagnosticAlert();
     } else {
-      clean[k] = v;
+      badge.className = 'badge bg-warning-subtle text-dark border border-warning px-2 py-1 small fw-semibold';
+      badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Mode Offline (Lokal)';
+      badge.title = errorMsg ? ('Koneksi Cloud: ' + errorMsg + '. Klik untuk cek status & coba lagi.') : 'Klik di sini untuk tes koneksi Cloud Supabase.';
+      badge.onclick = () => CloudDB.showDiagnosticAlert();
+    }
+  },
+
+  async showDiagnosticAlert() {
+    const sb = window.supabase || (typeof supabase !== 'undefined' ? supabase : null);
+    let msg = '=== DIAGNOSTIK KONEKSI CLOUD KANTIN 77 ===\n\n';
+    msg += '1. Library Supabase di Browser: ' + (sb ? '✅ Terpasang (OK)' : '❌ Belum Terpasang (Pastikan file index.html terbaru sudah diunggah)') + '\n';
+    msg += '2. Status Koneksi Cloud: ' + (this.isOnline ? '🟢 TERHUBUNG (Online Real-Time)' : '🔴 BELUM TERHUBUNG (Offline)') + '\n';
+    if (this.lastError) {
+      msg += '3. Pesan Sistem / Error: ' + this.lastError + '\n';
+    }
+    msg += '4. URL Project: ' + SUPABASE_CONFIG.url + '\n\n';
+    msg += 'Klik [OK] jika ingin mencoba menghubungkan ulang ke Supabase Cloud sekarang.';
+
+    if (confirm(msg)) {
+      const ok = await this.init();
+      if (ok) {
+        await this.initialSyncFromLocal();
+        alert('✅ Sukses! Aplikasi Anda kini ONLINE dan terhubung ke Database Supabase.');
+      } else {
+        alert('❌ Belum berhasil: ' + (this.lastError || 'Silakan pastikan internet aktif dan file terbaru sudah di-commit di GitHub.'));
+      }
+    }
+  },
+
+  setupRealtimeListeners() {
+    if (!this.client) return;
+    try {
+      this.client
+        .channel('canteen-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+          console.log('⚡ Pembaruan produk diterima dari cloud!');
+          if (window.MasterProduk) await MasterProduk.renderTable();
+          if (window.POS) await POS.renderProducts();
+          if (window.App) await App.refreshDashboard();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, async () => {
+          console.log('⚡ Transaksi baru diterima dari cloud!');
+          if (window.App) await App.refreshDashboard();
+          if (window.RiwayatTransaksi) await RiwayatTransaksi.renderTable();
+        })
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription error:', e);
+    }
+  },
+
+  async initialSyncFromLocal() {
+    if (!this.client || !this.isOnline) return;
+    try {
+      const { data: cloudProducts, error } = await this.client.from('products').select('id').limit(1);
+      if (error) {
+        console.warn('Tabel Supabase belum dibuat di SQL Editor:', error.message);
+        return;
+      }
+      if (!cloudProducts || cloudProducts.length === 0) {
+        console.log('Cloud masih kosong. Mengunggah data awal komputer kantor ke cloud...');
+        const localProducts = await db.getAll('products');
+        if (localProducts.length > 0) {
+          const toUpload = localProducts.map(p => {
+            const item = { ...p };
+            delete item.id;
+            return item;
+          });
+          const { error: insErr } = await this.client.from('products').insert(toUpload);
+          if (!insErr) {
+            console.log('✅ Seluruh produk komputer kantor berhasil diunggah ke Cloud Supabase!');
+          } else {
+            console.warn('Gagal upload produk ke Supabase:', insErr.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Initial sync error:', err);
     }
   }
-  return clean;
-}
+};
+window.CloudDB = CloudDB;
 
 class CanteenDB {
   constructor() {
     this.db = null;
-    this.firestore = null;
-    this.isCloud = false;
-    this.stores = [
-      'products', 'transactions', 'restocks', 'expenses', 
-      'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
-      'daily_closures', 'settings'
-    ];
   }
 
-  // Initialize both IndexedDB and Firebase Firestore
+  // Initialize and open IndexedDB
   async init() {
-    // 1. Initialize local IndexedDB first
-    await this.initIndexedDB();
-
-    // 2. Initialize and verify Google Firebase Cloud Firestore
-    await this.initFirebaseCloud();
-
-    return this.db;
-  }
-
-  // Initialize IndexedDB
-  async initIndexedDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
 
+        // 1. Products Store
         if (!db.objectStoreNames.contains('products')) {
           const productStore = db.createObjectStore('products', { keyPath: 'id', autoIncrement: true });
           productStore.createIndex('code', 'code', { unique: false });
           productStore.createIndex('category', 'category', { unique: false });
           productStore.createIndex('name', 'name', { unique: false });
         }
+
+        // 2. Transactions Store (POS Orders)
         if (!db.objectStoreNames.contains('transactions')) {
           const trxStore = db.createObjectStore('transactions', { keyPath: 'id', autoIncrement: true });
           trxStore.createIndex('order_number', 'order_number', { unique: true });
           trxStore.createIndex('date', 'date', { unique: false });
           trxStore.createIndex('status', 'status', { unique: false });
         }
+
+        // 3. Restocks Store (Barang Masuk)
         if (!db.objectStoreNames.contains('restocks')) {
           const restockStore = db.createObjectStore('restocks', { keyPath: 'id', autoIncrement: true });
           restockStore.createIndex('date', 'date', { unique: false });
           restockStore.createIndex('supplier_id', 'supplier_id', { unique: false });
           restockStore.createIndex('product_id', 'product_id', { unique: false });
         }
+
+        // 4. Expenses Store (Pengeluaran Operasional)
         if (!db.objectStoreNames.contains('expenses')) {
           const expenseStore = db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
           expenseStore.createIndex('date', 'date', { unique: false });
           expenseStore.createIndex('category', 'category', { unique: false });
         }
+
+        // 5. Suppliers Store
         if (!db.objectStoreNames.contains('suppliers')) {
           const suppStore = db.createObjectStore('suppliers', { keyPath: 'id', autoIncrement: true });
           suppStore.createIndex('name', 'name', { unique: false });
         }
+
+        // 6. Debts Store (Hutang Supplier)
         if (!db.objectStoreNames.contains('debts')) {
           const debtStore = db.createObjectStore('debts', { keyPath: 'id', autoIncrement: true });
           debtStore.createIndex('supplier_id', 'supplier_id', { unique: false });
           debtStore.createIndex('status', 'status', { unique: false });
         }
+
+        // 7. Cash Mutations Store (Buku Kas)
         if (!db.objectStoreNames.contains('cash_mutations')) {
           const cashStore = db.createObjectStore('cash_mutations', { keyPath: 'id', autoIncrement: true });
           cashStore.createIndex('date', 'date', { unique: false });
           cashStore.createIndex('type', 'type', { unique: false });
         }
+
+        // 8. Stock Opname Store
         if (!db.objectStoreNames.contains('stock_opname')) {
           const opnameStore = db.createObjectStore('stock_opname', { keyPath: 'id', autoIncrement: true });
           opnameStore.createIndex('date', 'date', { unique: false });
         }
+
+        // 9. Daily Closures Store (Tutup Harian)
         if (!db.objectStoreNames.contains('daily_closures')) {
           const closureStore = db.createObjectStore('daily_closures', { keyPath: 'id', autoIncrement: true });
           closureStore.createIndex('date', 'date', { unique: true });
         }
+
+        // 10. Settings Store
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
       };
 
-      request.onsuccess = (event) => {
+      request.onsuccess = async (event) => {
         this.db = event.target.result;
+        // Check if database is empty; if so, populate with initial canteen demo data
+        await this.checkAndSeedDefaultData();
+        
+        // Inisialisasi CloudDB Supabase & Sync Otomatis
+        if (window.CloudDB) {
+          window.CloudDB.init();
+          await window.CloudDB.initialSyncFromLocal();
+        }
+
         resolve(this.db);
       };
 
@@ -116,260 +260,27 @@ class CanteenDB {
     });
   }
 
-  // Connect to Firebase Cloud Firestore and auto-sync
-  async initFirebaseCloud() {
-    if (window.firestoreDb) {
-      this.firestore = window.firestoreDb;
-    } else if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-      this.firestore = firebase.firestore();
-    }
-
-    if (!this.firestore) {
-      console.log('🔵 Firebase belum aktif. Menggunakan penyimpanan lokal (IndexedDB).');
-      this.isCloud = false;
-      await this.checkAndSeedDefaultData();
-      return;
-    }
-
-    try {
-      // Test read to check network connectivity and security rules
-      const testSnap = await this.firestore.collection('settings').limit(1).get();
-      this.isCloud = true;
-      console.log('🟢 Terhubung ke Google Firebase Cloud Database (Real-Time)!');
-
-      // Update badge in UI
-      if (window.API && typeof API.updateConnectionBadge === 'function') {
-        API.updateConnectionBadge(true, 'cloud');
-      }
-
-      // Check whether Firestore already has products
-      const cloudProdsSnap = await this.firestore.collection('products').limit(1).get();
-      if (cloudProdsSnap.empty) {
-        // Firestore is empty. Check if local IndexedDB has existing user products (e.g. from Laptop)
-        const localProds = await this.getAllLocal('products');
-        if (localProds && localProds.length > 0) {
-          console.log('📤 Mengunggah data lokal ke Firebase Cloud...');
-          await this.migrateLocalToCloud();
-          console.log('✅ Data lokal berhasil dimigrasikan ke Cloud Firebase!');
-        } else {
-          // Both are empty, seed default realistic canteen data
-          console.log('🌱 Menyiapkan data awal kantin di Firebase Cloud...');
-          await this.seedDemoData();
-        }
-      } else {
-        // Cloud has data! Sync cloud products down to IndexedDB cache
-        this.syncCloudToLocalCache();
-      }
-
-      // Setup real-time listeners so changes in HP appear on Laptop and vice versa
-      this.setupRealtimeListeners();
-
-    } catch (err) {
-      console.warn('⚠️ Gagal terhubung ke Firebase Firestore (mungkin rules belum dibuka atau offline):', err.message);
-      this.isCloud = false;
-      await this.checkAndSeedDefaultData();
-    }
-  }
-
-  // Real-time listener for multi-device sync
-  setupRealtimeListeners() {
-    if (!this.firestore) return;
-
-    // Listen for product & stock changes
-    this.firestore.collection('products').onSnapshot((snapshot) => {
-      if (!snapshot.metadata.hasPendingWrites && snapshot.docChanges().length > 0) {
-        console.log('🔄 Data produk disinkronkan dari perangkat lain (Cloud).');
-        if (window.POS && typeof POS.renderProducts === 'function' && App.activeView === 'penjualan') {
-          POS.renderProducts();
-        }
-        if (window.MasterProduk && typeof MasterProduk.renderTable === 'function' && App.activeView === 'master-produk') {
-          MasterProduk.renderTable();
-        }
-        if (window.StokBarang && typeof StokBarang.renderTable === 'function' && App.activeView === 'stok-barang') {
-          StokBarang.renderTable();
-        }
-        if (window.App && typeof App.refreshDashboard === 'function' && App.activeView === 'dashboard') {
-          App.refreshDashboard();
-        }
-      }
-    }, (err) => console.warn('Product listener error:', err));
-
-    // Listen for transaction changes
-    this.firestore.collection('transactions').onSnapshot((snapshot) => {
-      if (!snapshot.metadata.hasPendingWrites && snapshot.docChanges().length > 0) {
-        console.log('🔄 Transaksi baru terdeteksi dari cloud.');
-        if (window.App && typeof App.refreshDashboard === 'function') {
-          App.refreshDashboard();
-        }
-        if (window.RiwayatTransaksi && typeof RiwayatTransaksi.renderTable === 'function' && App.activeView === 'riwayat-transaksi') {
-          RiwayatTransaksi.renderTable();
-        }
-      }
-    }, (err) => console.warn('Transaction listener error:', err));
-  }
-
-  // ==================== GENERIC CRUD METHODS ====================
-
-  // 1. GET ALL
-  async getAll(storeName) {
-    if (this.isCloud && this.firestore) {
-      try {
-        const snap = await this.firestore.collection(storeName).get();
-        const list = [];
-        snap.forEach(doc => {
-          const item = doc.data();
-          if (item.id === undefined) {
-            item.id = !isNaN(Number(doc.id)) ? Number(doc.id) : doc.id;
-          }
-          list.push(item);
-        });
-
-        // Sort items by ID if numeric
-        list.sort((a, b) => {
-          if (typeof a.id === 'number' && typeof b.id === 'number') return a.id - b.id;
-          return 0;
-        });
-
-        // Update local cache in background
-        this.cacheLocal(storeName, list);
-
-        return list;
-      } catch (e) {
-        console.warn(`Firestore getAll [${storeName}] failed, using local cache:`, e.message);
-      }
-    }
-    return this.getAllLocal(storeName);
-  }
-
-  // 2. GET BY ID
-  async get(storeName, id) {
-    if (this.isCloud && this.firestore) {
-      try {
-        const doc = await this.firestore.collection(storeName).doc(String(id)).get();
-        if (doc.exists) {
-          const item = doc.data();
-          if (item.id === undefined) {
-            item.id = !isNaN(Number(doc.id)) ? Number(doc.id) : doc.id;
-          }
-          return item;
-        }
-        return null;
-      } catch (e) {
-        console.warn(`Firestore get [${storeName}/${id}] failed:`, e.message);
-      }
-    }
-    return this.getLocal(storeName, id);
-  }
-
-  // 3. ADD RECORD
-  async add(storeName, data) {
-    if (data.id === undefined) {
-      data.id = Date.now();
-    }
-    const cleanData = sanitizeForFirestore(data);
-
-    if (this.isCloud && this.firestore) {
-      try {
-        await this.firestore.collection(storeName).doc(String(data.id)).set(cleanData);
-      } catch (e) {
-        console.warn(`Firestore add [${storeName}] failed:`, e.message);
-      }
-    }
-
-    await this.putLocal(storeName, data);
-    return data.id;
-  }
-
-  // 4. PUT (UPDATE / CREATE) RECORD
-  async put(storeName, data) {
-    const docKey = data.id !== undefined ? String(data.id) : (data.key || String(Date.now()));
-    if (data.id === undefined && storeName !== 'settings') {
-      data.id = !isNaN(Number(docKey)) ? Number(docKey) : docKey;
-    }
-    const cleanData = sanitizeForFirestore(data);
-
-    if (this.isCloud && this.firestore) {
-      try {
-        await this.firestore.collection(storeName).doc(docKey).set(cleanData, { merge: true });
-      } catch (e) {
-        console.warn(`Firestore put [${storeName}/${docKey}] failed:`, e.message);
-      }
-    }
-
-    await this.putLocal(storeName, data);
-    return data.id || data.key;
-  }
-
-  // 5. DELETE RECORD
-  async delete(storeName, id) {
-    if (this.isCloud && this.firestore) {
-      try {
-        await this.firestore.collection(storeName).doc(String(id)).delete();
-      } catch (e) {
-        console.warn(`Firestore delete [${storeName}/${id}] failed:`, e.message);
-      }
-    }
-
-    await this.deleteLocal(storeName, id);
-    return true;
-  }
-
-  // 6. CLEAR STORE
-  async clear(storeName) {
-    if (this.isCloud && this.firestore) {
-      try {
-        const snap = await this.firestore.collection(storeName).get();
-        const batch = this.firestore.batch();
-        snap.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      } catch (e) {
-        console.warn(`Firestore clear [${storeName}] failed:`, e.message);
-      }
-    }
-
-    await this.clearLocal(storeName);
-    return true;
-  }
-
-  // 7. SETTINGS GETTER
-  async getSetting(key, defaultValue = null) {
-    if (this.isCloud && this.firestore) {
-      try {
-        const doc = await this.firestore.collection('settings').doc(key).get();
-        if (doc.exists && doc.data() && doc.data().value !== undefined) {
-          return doc.data().value;
-        }
-      } catch (e) {
-        // Fallback to local
-      }
-    }
-    return this.getSettingLocal(key, defaultValue);
-  }
-
-  // 8. SETTINGS SETTER
-  async setSetting(key, value) {
-    const item = { key, value, updated_at: new Date().toISOString() };
-    const cleanData = sanitizeForFirestore(item);
-
-    if (this.isCloud && this.firestore) {
-      try {
-        await this.firestore.collection('settings').doc(key).set(cleanData);
-      } catch (e) {
-        console.warn(`Firestore setSetting [${key}] failed:`, e.message);
-      }
-    }
-
-    return this.putLocal('settings', item);
-  }
-
-  // ==================== LOCAL INDEXEDDB HELPERS ====================
-
+  // Generic helper for transaction
   tx(storeName, mode = 'readonly') {
     const transaction = this.db.transaction(storeName, mode);
     return transaction.objectStore(storeName);
   }
 
-  async getAllLocal(storeName) {
+  // Get all records from a store (Otomatis dari Cloud jika Online, dengan fallback Lokal)
+  async getAll(storeName) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        const { data, error } = await window.CloudDB.client.from(storeName).select('*').order('id', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          for (const item of data) {
+            await this.putLocal(storeName, item);
+          }
+          return data;
+        }
+      } catch (e) {
+        console.warn(`CloudDB getAll failed for ${storeName}:`, e);
+      }
+    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readonly');
       const req = store.getAll();
@@ -378,7 +289,27 @@ class CanteenDB {
     });
   }
 
-  async getLocal(storeName, id) {
+  putLocal(storeName, data) {
+    return new Promise((resolve) => {
+      try {
+        const store = this.tx(storeName, 'readwrite');
+        const req = store.put(data);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  // Get record by ID
+  async get(storeName, id) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        const { data, error } = await window.CloudDB.client.from(storeName).select('*').eq('id', id).maybeSingle();
+        if (!error && data) return data;
+      } catch (e) {}
+    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readonly');
       const req = store.get(id);
@@ -387,16 +318,50 @@ class CanteenDB {
     });
   }
 
-  async putLocal(storeName, data) {
+  // Add record
+  async add(storeName, data) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        const payload = { ...data };
+        delete payload.id;
+        const { data: inserted, error } = await window.CloudDB.client.from(storeName).insert(payload).select().single();
+        if (!error && inserted) {
+          await this.putLocal(storeName, inserted);
+          return inserted.id;
+        }
+      } catch (e) {
+        console.warn(`CloudDB add failed for ${storeName}:`, e);
+      }
+    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readwrite');
-      const req = store.put(data);
+      const req = store.add(data);
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
   }
 
-  async deleteLocal(storeName, id) {
+  // Put (update or create) record
+  async put(storeName, data) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client && data.id) {
+      try {
+        await window.CloudDB.client.from(storeName).upsert(data);
+      } catch (e) {
+        console.warn(`CloudDB put failed for ${storeName}:`, e);
+      }
+    }
+    return this.putLocal(storeName, data);
+  }
+
+  // Delete record by ID
+  async delete(storeName, id) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        await window.CloudDB.client.from(storeName).delete().eq('id', id);
+      } catch (e) {
+        console.warn(`CloudDB delete failed for ${storeName}:`, e);
+      }
+    }
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readwrite');
       const req = store.delete(id);
@@ -405,7 +370,8 @@ class CanteenDB {
     });
   }
 
-  async clearLocal(storeName) {
+  // Clear an entire store
+  async clear(storeName) {
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readwrite');
       const req = store.clear();
@@ -414,7 +380,16 @@ class CanteenDB {
     });
   }
 
-  async getSettingLocal(key, defaultValue = null) {
+  // Settings: get value by key
+  async getSetting(key, defaultValue = null) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        const { data, error } = await window.CloudDB.client.from('settings').select('value').eq('key', key).maybeSingle();
+        if (!error && data && data.value !== undefined) {
+          return data.value;
+        }
+      } catch (e) {}
+    }
     return new Promise((resolve) => {
       const store = this.tx('settings', 'readonly');
       const req = store.get(key);
@@ -429,72 +404,65 @@ class CanteenDB {
     });
   }
 
-  // Cache items into local IndexedDB
-  async cacheLocal(storeName, items) {
-    try {
-      const store = this.tx(storeName, 'readwrite');
-      for (const item of items) {
-        store.put(item);
-      }
-    } catch (e) {
-      // Ignore background cache errors
+  // Settings: set value
+  async setSetting(key, value) {
+    if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+      try {
+        await window.CloudDB.client.from('settings').upsert({ key, value: String(value), updated_at: new Date().toISOString() });
+      } catch (e) {}
     }
+    return this.put('settings', { key, value, updated_at: new Date().toISOString() });
   }
 
-  // Sync all cloud data down to local cache
-  async syncCloudToLocalCache() {
-    for (const s of ['products', 'suppliers', 'settings']) {
-      await this.getAll(s);
-    }
-  }
-
-  // Migrate existing local laptop IndexedDB data to Firebase Cloud
-  async migrateLocalToCloud() {
-    for (const s of this.stores) {
-      const localItems = await this.getAllLocal(s);
-      if (localItems && localItems.length > 0) {
-        for (const item of localItems) {
-          const docKey = item.id !== undefined ? String(item.id) : (item.key || String(Date.now()));
-          await this.firestore.collection(s).doc(docKey).set(sanitizeForFirestore(item));
-        }
-      }
-    }
-  }
-
-  // ==================== BACKUP & RESTORE ====================
-
+  // Export entire database to JSON object
   async exportFullDatabase() {
+    const stores = [
+      'products', 'transactions', 'restocks', 'expenses', 
+      'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
+      'daily_closures', 'settings'
+    ];
     const backup = {
       app: 'SISTEM_KANTIN_SMPN_77',
-      version: '2.0-cloud',
+      version: '1.0',
       exported_at: new Date().toISOString(),
       data: {}
     };
 
-    for (const store of this.stores) {
+    for (const store of stores) {
       backup.data[store] = await this.getAll(store);
     }
     return backup;
   }
 
+  // Restore entire database from JSON object
   async restoreFullDatabase(backupObj) {
     if (!backupObj || !backupObj.data) {
       throw new Error('Format file backup tidak valid.');
     }
 
-    for (const store of this.stores) {
+    const stores = [
+      'products', 'transactions', 'restocks', 'expenses', 
+      'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
+      'daily_closures', 'settings'
+    ];
+
+    for (const store of stores) {
       if (backupObj.data[store]) {
         await this.clear(store);
+        const storeRef = this.tx(store, 'readwrite');
         for (const item of backupObj.data[store]) {
-          await this.put(store, item);
+          await new Promise((res, rej) => {
+            const req = storeRef.put(item);
+            req.onsuccess = () => res();
+            req.onerror = () => rej(req.error);
+          });
         }
       }
     }
     return true;
   }
 
-  // ==================== DEFAULT DEMO DATA SEEDING ====================
-
+  // Populate Default Realistic Data for SMPN 77
   async checkAndSeedDefaultData() {
     const products = await this.getAll('products');
     if (products.length === 0) {
@@ -504,17 +472,23 @@ class CanteenDB {
   }
 
   async seedDemoData() {
-    for (const s of this.stores) {
+    // Clear all stores first
+    const stores = [
+      'products', 'transactions', 'restocks', 'expenses', 
+      'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
+      'daily_closures', 'settings'
+    ];
+    for (const s of stores) {
       await this.clear(s);
     }
 
     // 1. Initial Settings
     const defaultSettings = [
-      { key: 'canteen_name', value: 'TOKO MINUMAN 77' },
-      { key: 'school_name', value: 'Kantin SMPN 77' },
+      { key: 'canteen_name', value: 'SISTEM KANTIN SMPN 77' },
+      { key: 'school_name', value: 'SMP Negeri 77 Jakarta' },
       { key: 'canteen_address', value: 'Jl. Cempaka Putih Tengah No. 1, Jakarta Pusat' },
       { key: 'receipt_footer', value: 'Terima kasih atas kunjungannya!\nSelamat belajar di SMPN 77.' },
-      { key: 'default_initial_cash', value: 200000 },
+      { key: 'default_initial_cash', value: 200000 }, // Modal kas uang kembalian Rp 200.000
       { key: 'admin_username', value: 'admin' },
       { key: 'admin_password', value: '123456' },
       { key: 'kasir_username', value: 'kasir' },
@@ -523,7 +497,7 @@ class CanteenDB {
       { key: 'staff_name', value: 'Pengelola Kantin' },
       { key: 'staff_username', value: 'admin' },
       { key: 'staff_password', value: '123456' },
-      { key: 'operational_date', value: new Date().toISOString().split('T')[0] }
+      { key: 'operational_date', value: (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toLocaleDateString('en-CA')) }
     ];
     for (const s of defaultSettings) {
       await this.setSetting(s.key, s.value);
@@ -539,13 +513,14 @@ class CanteenDB {
       await this.put('suppliers', sup);
     }
 
-    // 3. Initial Canteen Products
+    // 3. Initial Canteen Products (Bottled drinks & Snacks for SMPN 77)
     const initialProducts = [
-      { code: 'MIN-01', name: 'Aqua Botol 600ml', category: 'Air mineral', buy_price: 2500, sell_price: 3500, initial_stock: 48, min_stock: 3, stock: 0, unit: 'Botol' },
-      { code: 'MIN-02', name: 'Le Minerale 600ml', category: 'Air mineral', buy_price: 1950, sell_price: 5000, initial_stock: 48, min_stock: 3, stock: 23, unit: 'Botol' },
-      { code: 'MIN-03', name: 'Club Air Mineral 330ml', category: 'Air mineral', buy_price: 1500, sell_price: 2500, initial_stock: 24, min_stock: 3, stock: 0, unit: 'Botol' },
-      { code: 'MIN-04', name: 'Teh Pucuk Harum 350ml', category: 'Teh kemasan', buy_price: 2600, sell_price: 5000, initial_stock: 48, min_stock: 3, stock: 14, unit: 'Botol' },
-      { code: 'MIN-05', name: 'Fruit Tea Botol 350ml', category: 'Teh kemasan', buy_price: 2750, sell_price: 5000, initial_stock: 24, min_stock: 3, stock: 0, unit: 'Botol' },
+      // Minuman Botol & Kemasan
+      { code: 'MIN-01', name: 'Aqua Botol 600ml', category: 'Air mineral', buy_price: 2500, sell_price: 3500, initial_stock: 48, min_stock: 10, stock: 48, unit: 'Botol' },
+      { code: 'MIN-02', name: 'Le Minerale 600ml', category: 'Air mineral', buy_price: 2500, sell_price: 3500, initial_stock: 48, min_stock: 10, stock: 48, unit: 'Botol' },
+      { code: 'MIN-03', name: 'Club Air Mineral 330ml', category: 'Air mineral', buy_price: 1500, sell_price: 2500, initial_stock: 24, min_stock: 8, stock: 24, unit: 'Botol' },
+      { code: 'MIN-04', name: 'Teh Pucuk Harum 350ml', category: 'Teh kemasan', buy_price: 2800, sell_price: 4000, initial_stock: 48, min_stock: 12, stock: 48, unit: 'Botol' },
+      { code: 'MIN-05', name: 'Fruit Tea Botol 350ml', category: 'Teh kemasan', buy_price: 3000, sell_price: 4500, initial_stock: 24, min_stock: 8, stock: 24, unit: 'Botol' },
       { code: 'MIN-06', name: 'Teh Botol Sosro Kotak 250ml', category: 'Teh kemasan', buy_price: 2800, sell_price: 4000, initial_stock: 24, min_stock: 8, stock: 24, unit: 'Kotak' },
       { code: 'MIN-07', name: 'Floridina Orange 350ml', category: 'Minuman rasa buah', buy_price: 2600, sell_price: 3500, initial_stock: 36, min_stock: 10, stock: 36, unit: 'Botol' },
       { code: 'MIN-08', name: 'Minute Maid Pulpy Orange 300ml', category: 'Minuman rasa buah', buy_price: 4000, sell_price: 5500, initial_stock: 24, min_stock: 6, stock: 24, unit: 'Botol' },
@@ -554,6 +529,8 @@ class CanteenDB {
       { code: 'MIN-11', name: 'Ultra Milk Stroberi 200ml', category: 'Susu kemasan', buy_price: 4500, sell_price: 6000, initial_stock: 24, min_stock: 6, stock: 24, unit: 'Kotak' },
       { code: 'MIN-12', name: 'Milo Kotak UHT 180ml', category: 'Susu kemasan', buy_price: 5000, sell_price: 6500, initial_stock: 24, min_stock: 6, stock: 24, unit: 'Kotak' },
       { code: 'MIN-13', name: 'Indomilk Kids Cokelat 115ml', category: 'Susu kemasan', buy_price: 2800, sell_price: 4000, initial_stock: 24, min_stock: 6, stock: 24, unit: 'Kotak' },
+
+      // Aneka Snack / Makanan Ringan
       { code: 'SNK-01', name: 'Chitato Sapi Panggang 35g', category: 'Keripik', buy_price: 4500, sell_price: 6000, initial_stock: 20, min_stock: 5, stock: 20, unit: 'Bungkus' },
       { code: 'SNK-02', name: 'Qtela Singkong Balado 60g', category: 'Keripik', buy_price: 4200, sell_price: 5500, initial_stock: 20, min_stock: 5, stock: 20, unit: 'Bungkus' },
       { code: 'SNK-03', name: 'Kusuka Keripik Singkong 60g', category: 'Keripik', buy_price: 4000, sell_price: 5500, initial_stock: 15, min_stock: 5, stock: 15, unit: 'Bungkus' },
@@ -575,7 +552,7 @@ class CanteenDB {
       await this.put('products', p);
     }
 
-    // 4. Initial Cash Opening
+    // 4. Initial Cash Opening (Rp 200.000)
     const today = new Date().toISOString().split('T')[0];
     await this.add('cash_mutations', {
       date: today,
@@ -589,9 +566,10 @@ class CanteenDB {
       ref_id: 'MODAL-AWAL'
     });
 
-    console.log('✅ Data awal toko Kantin SMPN 77 berhasil disiapkan.');
+    console.log('Data awal Kantin SMPN 77 berhasil disiapkan.');
   }
 
+  // Clear trial transactions only (keeps products and suppliers)
   async clearTrialTransactionsOnly() {
     const trialStores = [
       'transactions', 'restocks', 'expenses', 
@@ -601,12 +579,14 @@ class CanteenDB {
       await this.clear(s);
     }
 
+    // Reset each product's stock back to initial_stock
     const products = await this.getAll('products');
     for (const p of products) {
       p.stock = p.initial_stock || 0;
       await this.put('products', p);
     }
 
+    // Restore initial cash (Rp 200.000)
     const today = new Date().toISOString().split('T')[0];
     const defaultInitialCash = await this.getSetting('default_initial_cash', 200000);
     await this.add('cash_mutations', {
