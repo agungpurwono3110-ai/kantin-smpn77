@@ -26,7 +26,7 @@ const API = {
   },
 
   updateConnectionBadge(online) {
-    if (window.location.hostname.includes('github.io') || window.CloudDB || window.SUPABASE_CONFIG || document.querySelector('script[src*="supabase"]')) return;
+    if (window.location.hostname.includes('github.io') || window.location.hostname.includes('vercel.app') || window.CloudDB || window.SUPABASE_CONFIG || document.querySelector('script[src*="supabase"]')) return;
 
     const badge = document.getElementById('badge-connection-status');
     if (!badge) return;
