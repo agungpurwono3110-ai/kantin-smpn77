@@ -11,6 +11,7 @@ const SUPABASE_CONFIG = {
   url: 'https://tbapbfcgvlbtzcfsacru.supabase.co',
   key: 'sb_publishable_rdR2danAo3TKj5uQzmtvmg_T3zQOOnr'
 };
+window.SUPABASE_CONFIG = SUPABASE_CONFIG;
 
 const CloudDB = {
   client: null,
@@ -106,22 +107,133 @@ const CloudDB = {
   setupRealtimeListeners() {
     if (!this.client) return;
     try {
-      this.client
-        .channel('canteen-sync')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
-          console.log('⚡ Pembaruan produk diterima dari cloud!');
+      let syncTimer = null;
+      const debouncedRefresh = () => {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(async () => {
+          console.log('⚡ Pembaruan diterima dari Cloud Supabase! Memperbarui tampilan...');
           if (window.MasterProduk) await MasterProduk.renderTable();
           if (window.POS) await POS.renderProducts();
-          if (window.App) await App.refreshDashboard();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, async () => {
-          console.log('⚡ Transaksi baru diterima dari cloud!');
-          if (window.App) await App.refreshDashboard();
+          if (window.StokBarang) await StokBarang.renderTable();
           if (window.RiwayatTransaksi) await RiwayatTransaksi.renderTable();
-        })
+          if (window.App) await App.refreshDashboard();
+        }, 400);
+      };
+
+      this.client
+        .channel('canteen-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'restocks' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_mutations' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_opname' }, debouncedRefresh)
         .subscribe();
     } catch (e) {
       console.warn('Realtime subscription error:', e);
+    }
+  },
+
+  async forcePushAllToCloud() {
+    if (!this.client || !this.isOnline) {
+      alert('Gagal menyinkronkan: Status koneksi saat ini Offline.\nPastikan perangkat terhubung ke internet.');
+      return false;
+    }
+    if (!confirm('SINKRONKAN DATA KE CLOUD:\n\nSemua produk, stok, dan riwayat transaksi di perangkat ini akan diunggah ke Cloud Supabase sebagai DATA UTAMA.\n\nPerangkat lain (seperti HP Anda) akan otomatis menerima data yang persis sama. Lanjutkan?')) {
+      return false;
+    }
+
+    try {
+      const stores = [
+        'products', 'transactions', 'restocks', 'expenses', 
+        'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
+        'daily_closures', 'settings'
+      ];
+
+      for (const store of stores) {
+        const localItems = await new Promise((resolve) => {
+          const s = db.tx(store, 'readonly');
+          const req = s.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+
+        if (localItems.length > 0) {
+          if (store === 'settings') {
+            await this.client.from(store).delete().neq('key', '___none___');
+          } else {
+            await this.client.from(store).delete().neq('id', 0);
+          }
+
+          const batch = localItems.map(item => {
+            const copy = { ...item };
+            delete copy.id;
+            return copy;
+          });
+
+          for (let i = 0; i < batch.length; i += 50) {
+            const chunk = batch.slice(i, i + 50);
+            await this.client.from(store).insert(chunk);
+          }
+        }
+      }
+
+      alert('✅ Sukses! Seluruh data di perangkat ini telah diunggah ke Cloud Supabase.\n\nSekarang buka HP Anda dan lakukan Refresh, data di HP akan langsung persis sama 100%!');
+      if (window.App) await App.refreshDashboard();
+      return true;
+    } catch (err) {
+      alert('Gagal mengunggah ke Cloud: ' + err.message);
+      return false;
+    }
+  },
+
+  async forcePullFromCloud() {
+    if (!this.client || !this.isOnline) {
+      alert('Gagal menarik data: Status saat ini Offline.\nPastikan perangkat terhubung ke internet.');
+      return false;
+    }
+
+    try {
+      const stores = [
+        'products', 'transactions', 'restocks', 'expenses', 
+        'suppliers', 'debts', 'cash_mutations', 'stock_opname', 
+        'daily_closures', 'settings'
+      ];
+
+      for (const store of stores) {
+        const { data, error } = await this.client.from(store).select('*').order(store === 'settings' ? 'key' : 'id', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          await db.clear(store);
+          for (const item of data) {
+            await db.putLocal(store, item);
+          }
+        }
+      }
+
+      alert('✅ Berhasil menarik data terbaru dari Cloud Supabase!\nHalaman akan dimuat ulang untuk menampilkan data terkini.');
+      window.location.reload();
+      return true;
+    } catch (err) {
+      alert('Gagal menarik data dari Cloud: ' + err.message);
+      return false;
+    }
+  },
+
+  async quickSync() {
+    if (!this.client || !this.isOnline) {
+      this.showDiagnosticAlert();
+      return;
+    }
+    const choice = confirm(
+      'SINKRONISASI DATA KANTIN 77 (HP & KOMPUTER)\n\n' +
+      '• Klik [OK] untuk JADIKAN DATA PERANGKAT INI SEBAGAI ACUAN UTAMA\n' +
+      '  (Data di perangkat ini akan dikirim ke Cloud agar perangkat lain mengikuti)\n\n' +
+      '• Klik [BATAL / Cancel] untuk TARIK DATA TERBARU DARI CLOUD\n' +
+      '  (Perangkat ini akan mengambil data terbaru yang ada di Cloud)'
+    );
+    if (choice) {
+      await this.forcePushAllToCloud();
+    } else {
+      await this.forcePullFromCloud();
     }
   },
 
@@ -145,8 +257,6 @@ const CloudDB = {
           const { error: insErr } = await this.client.from('products').insert(toUpload);
           if (!insErr) {
             console.log('✅ Seluruh produk komputer kantor berhasil diunggah ke Cloud Supabase!');
-          } else {
-            console.warn('Gagal upload produk ke Supabase:', insErr.message);
           }
         }
       }
@@ -246,7 +356,7 @@ class CanteenDB {
         
         // Inisialisasi CloudDB Supabase & Sync Otomatis
         if (window.CloudDB) {
-          window.CloudDB.init();
+          await window.CloudDB.init();
           await window.CloudDB.initialSyncFromLocal();
         }
 
@@ -270,8 +380,11 @@ class CanteenDB {
   async getAll(storeName) {
     if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
       try {
-        const { data, error } = await window.CloudDB.client.from(storeName).select('*').order('id', { ascending: true });
+        const orderCol = storeName === 'settings' ? 'key' : 'id';
+        const { data, error } = await window.CloudDB.client.from(storeName).select('*').order(orderCol, { ascending: true });
         if (!error && Array.isArray(data) && data.length > 0) {
+          // Bersihkan data lokal lama agar data HP dan PC selalu 100% sinkron
+          await this.clear(storeName);
           for (const item of data) {
             await this.putLocal(storeName, item);
           }
@@ -456,6 +569,28 @@ class CanteenDB {
             req.onsuccess = () => res();
             req.onerror = () => rej(req.error);
           });
+        }
+
+        // Sinkronkan juga ke Cloud Supabase jika Online
+        if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+          try {
+            if (store === 'settings') {
+              await window.CloudDB.client.from(store).delete().neq('key', '___none___');
+            } else {
+              await window.CloudDB.client.from(store).delete().neq('id', 0);
+            }
+            const toUpload = backupObj.data[store].map(item => {
+              const copy = { ...item };
+              delete copy.id;
+              return copy;
+            });
+            for (let i = 0; i < toUpload.length; i += 50) {
+              const chunk = toUpload.slice(i, i + 50);
+              await window.CloudDB.client.from(store).insert(chunk);
+            }
+          } catch (cloudErr) {
+            console.warn(`Gagal sync restore ke Supabase untuk ${store}:`, cloudErr);
+          }
         }
       }
     }

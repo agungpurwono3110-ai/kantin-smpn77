@@ -1592,20 +1592,60 @@ const MasterProduk = {
           return;
         }
 
+        const isReplace = confirm(
+          `Ditemukan ${rows.length} baris produk dalam file Excel.\n\n` +
+          `PILIH METODE IMPOR:\n` +
+          `• Klik [OK] untuk GANTI TOTAL (Hapus semua produk lama/contoh & ganti murni dengan data Excel ini)\n` +
+          `• Klik [BATAL / Cancel] untuk GABUNGKAN / UPDATE (Perbarui stok produk yang sudah ada & tambahkan produk baru)`
+        );
+
+        const currentProducts = await db.getAll('products');
+        const existingMap = new Map();
+        currentProducts.forEach(p => {
+          if (p.code) existingMap.set(String(p.code).toLowerCase().trim(), p);
+          if (p.name) existingMap.set(String(p.name).toLowerCase().trim(), p);
+        });
+
+        if (isReplace) {
+          if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+            await window.CloudDB.client.from('products').delete().neq('id', 0);
+          }
+          await db.clear('products');
+        }
+
         let importedCount = 0;
+        let updatedCount = 0;
+        const batchToInsert = [];
+
         for (const row of rows) {
-          const code = row['Kode Produk'] || row['kode'] || `PROD-${Date.now().toString().slice(-4)}`;
-          const name = row['Nama Produk'] || row['nama'];
+          const code = String(row['Kode Produk'] || row['kode'] || row['Kode'] || `PROD-${Date.now().toString().slice(-4)}`).trim();
+          const name = String(row['Nama Produk'] || row['nama'] || row['Nama'] || '').trim();
           if (!name) continue;
 
-          const category = row['Kategori'] || 'Snack lainnya';
-          const buy_price = parseNumber(row['Harga Modal'] || row['modal'] || 0);
-          const sell_price = parseNumber(row['Harga Jual'] || row['jual'] || 0);
-          const stock = parseNumber(row['Stok Tersedia'] || row['Stok'] || row['stok'] || 0);
-          const min_stock = parseNumber(row['Stok Minimum'] || 5);
-          const unit = row['Satuan'] || 'Pcs';
+          const category = row['Kategori'] || row['kategori'] || 'Snack lainnya';
+          const buy_price = parseNumber(row['Harga Modal'] || row['modal'] || row['Modal'] || row['Harga Beli'] || 0);
+          const sell_price = parseNumber(row['Harga Jual'] || row['jual'] || row['Jual'] || 0);
+          const stock = parseNumber(row['Stok Tersedia'] || row['Stok'] || row['stok'] || row['Jumlah'] || 0);
+          const min_stock = parseNumber(row['Stok Minimum'] || row['min_stock'] || 5);
+          const unit = row['Satuan'] || row['satuan'] || 'Pcs';
 
-          await db.add('products', {
+          if (!isReplace) {
+            const existing = existingMap.get(code.toLowerCase()) || existingMap.get(name.toLowerCase());
+            if (existing) {
+              existing.stock = stock;
+              existing.initial_stock = stock;
+              existing.buy_price = buy_price || existing.buy_price;
+              existing.sell_price = sell_price || existing.sell_price;
+              existing.profit = existing.sell_price - existing.buy_price;
+              existing.min_stock = min_stock;
+              existing.unit = unit;
+              await db.put('products', existing);
+              updatedCount++;
+              continue;
+            }
+          }
+
+          batchToInsert.push({
             code,
             name,
             category,
@@ -1621,9 +1661,41 @@ const MasterProduk = {
           importedCount++;
         }
 
-        alert(`Berhasil mengimpor ${importedCount} produk dari file Excel!`);
+        if (batchToInsert.length > 0) {
+          if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+            const { data: cloudInserted, error } = await window.CloudDB.client.from('products').insert(batchToInsert).select();
+            if (!error && cloudInserted) {
+              for (const p of cloudInserted) {
+                await db.putLocal('products', p);
+              }
+            } else {
+              for (const p of batchToInsert) {
+                await db.add('products', p);
+              }
+            }
+          } else {
+            for (const p of batchToInsert) {
+              await db.add('products', p);
+            }
+          }
+        }
+
+        let alertMsg = `Proses Impor Selesai!\n\n`;
+        if (isReplace) {
+          alertMsg += `✅ Berhasil mengganti total seluruh produk dengan ${importedCount} produk baru dari Excel.`;
+        } else {
+          alertMsg += `✅ ${importedCount} produk baru ditambahkan.\n✅ ${updatedCount} produk yang sudah ada diperbarui stoknya.`;
+        }
+        if (window.CloudDB && window.CloudDB.isOnline) {
+          alertMsg += `\n\n🟢 Data langsung tersinkron otomatis ke Supabase Cloud & HP Anda!`;
+        } else {
+          alertMsg += `\n\n⚠️ Catatan: Saat ini sistem dalam Mode Offline. Hubungkan ke Cloud agar data tampil di HP.`;
+        }
+
+        alert(alertMsg);
         e.target.value = '';
         await MasterProduk.renderTable();
+        await StokBarang.renderTable();
         await POS.renderProducts();
         await App.refreshDashboard();
       } catch (err) {
@@ -2515,6 +2587,7 @@ const HutangSupplier = {
               </span>
             </td>
             <td class="text-end pe-3">
+
               ${!isLunas ? `
                 <button class="btn btn-sm btn-success py-0 px-2 fw-semibold" onclick="HutangSupplier.openPayModal(${d.id})">
                   <i class="bi bi-cash me-1"></i> Bayar
