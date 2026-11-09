@@ -634,27 +634,34 @@ const POS = {
   activeOrder: null,
 
   async init() {
-    this.renderCategoryPills();
+    await this.renderCategoryPills();
   },
 
-  renderCategoryPills() {
-    const categories = [
-      'Semua', 'Air mineral', 'Teh kemasan', 'Minuman rasa buah', 
-      'Susu kemasan', 'Minuman lainnya', 'Keripik', 'Biskuit', 
-      'Wafer', 'Permen', 'Cokelat', 'Snack lainnya'
-    ];
+  async renderCategoryPills() {
+    let cats = [];
+    if (window.MasterProduk && typeof MasterProduk.getCategories === 'function') {
+      cats = await MasterProduk.getCategories();
+    } else {
+      cats = [
+        'Air mineral', 'Teh kemasan', 'Minuman rasa buah', 
+        'Susu kemasan', 'Minuman lainnya', 'Keripik', 'Biskuit', 
+        'Wafer', 'Permen', 'Cokelat', 'Snack lainnya'
+      ];
+    }
+    const categories = ['Semua', ...cats];
     
     // Select dropdown in POS
     const selectEl = document.getElementById('pos-category-select');
     if (selectEl) {
       selectEl.innerHTML = categories.map(c => `<option value="${c === 'Semua' ? '' : c}">${c === 'Semua' ? 'Semua Kategori' : c}</option>`).join('');
+      selectEl.value = this.selectedCategory || '';
     }
 
     // Quick scrollable pills
     const pillsEl = document.getElementById('pos-quick-pills');
     if (pillsEl) {
       pillsEl.innerHTML = categories.map(c => `
-        <button type="button" class="pos-pill-btn ${c === 'Semua' ? 'active' : ''}" onclick="POS.selectCategory('${c === 'Semua' ? '' : c}', this)">
+        <button type="button" class="pos-pill-btn ${c === (this.selectedCategory || 'Semua') ? 'active' : ''}" onclick="POS.selectCategory('${c === 'Semua' ? '' : c}', this)">
           ${c}
         </button>
       `).join('');
@@ -1322,15 +1329,72 @@ const MasterProduk = {
     await this.renderTable();
   },
 
-  async loadCategoryFilter() {
-    const select = document.getElementById('prod-filter-cat');
-    if (!select) return;
-    const cats = [
+  async getCategories() {
+    const defaultCats = [
       'Air mineral', 'Teh kemasan', 'Minuman rasa buah', 'Susu kemasan', 
       'Minuman lainnya', 'Keripik', 'Biskuit', 'Wafer', 'Permen', 
       'Cokelat', 'Snack lainnya'
     ];
+    let customCats = [];
+    try {
+      const stored = await db.getSetting('custom_categories', '[]');
+      customCats = typeof stored === 'string' ? JSON.parse(stored || '[]') : (stored || []);
+    } catch (e) {
+      customCats = [];
+    }
+    const products = await db.getAll('products');
+    const fromProds = products.map(p => p.category).filter(Boolean);
+    return Array.from(new Set([...defaultCats, ...customCats, ...fromProds]));
+  },
+
+  async loadCategoryFilter() {
+    const select = document.getElementById('prod-filter-cat');
+    if (!select) return;
+    const cats = await this.getCategories();
     select.innerHTML = '<option value="">Semua Kategori</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  },
+
+  async loadCategorySelect(selectedVal = '') {
+    const select = document.getElementById('prod-category');
+    if (!select) return;
+    const cats = await this.getCategories();
+    select.innerHTML = '<option value="">Pilih Kategori...</option>' + 
+      cats.map(c => `<option value="${c}">${c}</option>`).join('') +
+      '<option value="__NEW__" class="fw-bold text-primary">+ Tambah Kategori Baru...</option>';
+    if (selectedVal) {
+      select.value = selectedVal;
+    }
+  },
+
+  async handleCategoryChange(selectEl) {
+    if (selectEl.value === '__NEW__') {
+      await this.addNewCategoryPrompt();
+    }
+  },
+
+  async addNewCategoryPrompt() {
+    const newCat = prompt('MASUKKAN NAMA JENIS / KATEGORI PRODUK BARU:\n\nContoh: Roti, Gorengan, Es Krim, Makanan Berat, ATK, Kopi');
+    if (!newCat || !newCat.trim()) {
+      const select = document.getElementById('prod-category');
+      if (select && select.value === '__NEW__') select.value = '';
+      return;
+    }
+    const trimmed = newCat.trim();
+    let customCats = [];
+    try {
+      const stored = await db.getSetting('custom_categories', '[]');
+      customCats = typeof stored === 'string' ? JSON.parse(stored || '[]') : (stored || []);
+    } catch (e) {
+      customCats = [];
+    }
+    if (!customCats.includes(trimmed)) {
+      customCats.push(trimmed);
+      await db.setSetting('custom_categories', JSON.stringify(customCats));
+    }
+    await this.loadCategorySelect(trimmed);
+    await this.loadCategoryFilter();
+    if (window.POS && typeof POS.renderCategoryPills === 'function') await POS.renderCategoryPills();
+    if (window.Rekap && typeof Rekap.loadCategories === 'function') await Rekap.loadCategories();
   },
 
   async renderTable() {
@@ -1383,23 +1447,24 @@ const MasterProduk = {
     }).join('');
   },
 
-  openModal(id = null) {
+  async openModal(id = null) {
     this.currentEditId = id;
     const form = document.getElementById('form-product');
     form.reset();
     document.getElementById('prod-image-data').value = '';
     document.getElementById('prod-image-preview-wrapper').style.display = 'none';
 
+    let selectedCat = '';
     if (id) {
       document.getElementById('modal-product-title').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Produk & Stok';
       const lblStock = document.getElementById('label-prod-stock');
       if (lblStock) lblStock.textContent = 'Jumlah Stok Tersedia Saat Ini';
-      db.get('products', id).then(prod => {
-        if (!prod) return;
+      const prod = await db.get('products', id);
+      if (prod) {
         document.getElementById('prod-id').value = prod.id;
         document.getElementById('prod-code').value = prod.code;
         document.getElementById('prod-name').value = prod.name;
-        document.getElementById('prod-category').value = prod.category;
+        selectedCat = prod.category;
         document.getElementById('prod-unit').value = prod.unit;
         document.getElementById('prod-buy-price').value = prod.buy_price;
         document.getElementById('prod-sell-price').value = prod.sell_price;
@@ -1412,7 +1477,7 @@ const MasterProduk = {
           document.getElementById('prod-image-preview').src = prod.image;
           document.getElementById('prod-image-preview-wrapper').style.display = 'block';
         }
-      });
+      }
     } else {
       document.getElementById('modal-product-title').innerHTML = '<i class="bi bi-box-seam me-2"></i>Tambah Produk Baru';
       const lblStock = document.getElementById('label-prod-stock');
@@ -1420,6 +1485,8 @@ const MasterProduk = {
       document.getElementById('prod-id').value = '';
       this.calculateProfit();
     }
+
+    await this.loadCategorySelect(selectedCat);
 
     const modal = new bootstrap.Modal(document.getElementById('modal-product'));
     modal.show();
@@ -1437,12 +1504,44 @@ const MasterProduk = {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        document.getElementById('prod-image-data').value = e.target.result;
-        document.getElementById('prod-image-preview').src = e.target.result;
-        document.getElementById('prod-image-preview-wrapper').style.display = 'block';
+        const img = new Image();
+        img.onload = () => {
+          // Kompresi & resize otomatis agar hemat memori & sinkronisasi cloud kilat
+          const canvas = document.createElement('canvas');
+          const maxDim = 400;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          document.getElementById('prod-image-data').value = compressedDataUrl;
+          document.getElementById('prod-image-preview').src = compressedDataUrl;
+          document.getElementById('prod-image-preview-wrapper').style.display = 'block';
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
+  },
+
+  removeImage() {
+    document.getElementById('prod-image-file').value = '';
+    document.getElementById('prod-image-data').value = '';
+    document.getElementById('prod-image-preview').src = '';
+    document.getElementById('prod-image-preview-wrapper').style.display = 'none';
   },
 
   async saveProduct(e) {
