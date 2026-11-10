@@ -692,6 +692,29 @@
                     <i class="bi bi-file-earmark-arrow-up me-1"></i> Import Excel
                     <input type="file" id="prod-import-file" accept=".xlsx,.xls,.csv" class="d-none" onchange="MasterProduk.importExcel(event)">
                   </label>
+                  <div class="dropdown">
+                    <button class="btn btn-outline-danger dropdown-toggle fw-semibold" data-bs-toggle="dropdown" title="Menu bersihkan duplikat atau hapus banyak produk">
+                      <i class="bi bi-trash3 me-1"></i> Bersihkan / Hapus Masal
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 280px;">
+                      <li>
+                        <a class="dropdown-item py-2 fw-semibold text-warning-emphasis rounded" href="#" onclick="MasterProduk.cleanDuplicates(); return false;">
+                          <i class="bi bi-magic me-2 text-warning fs-5 align-middle"></i> 🧹 Bersihkan Duplikat (1 Klik)
+                          <div class="small text-muted fw-normal ps-4" style="font-size: 11px;">Hapus produk kembar, sisakan 1 data asli</div>
+                        </a>
+                      </li>
+                      <li><hr class="dropdown-divider my-2"></li>
+                      <li>
+                        <a class="dropdown-item py-2 fw-semibold text-danger rounded" href="#" onclick="MasterProduk.deleteAllProducts(); return false;">
+                          <i class="bi bi-trash3-fill me-2 fs-5 align-middle"></i> 🗑️ Hapus SEMUA Produk (Kosongkan)
+                          <div class="small text-muted fw-normal ps-4" style="font-size: 11px;">Hapus total agar bisa Import Excel bersih dari awal</div>
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                  <button id="btn-delete-selected" class="btn btn-danger fw-semibold d-none" onclick="MasterProduk.deleteSelectedProducts()">
+                    <i class="bi bi-trash3 me-1"></i> Hapus Terpilih (<span id="count-selected">0</span>)
+                  </button>
                 </div>
               </div>
             </div>
@@ -704,7 +727,10 @@
                 <table class="table table-hover align-middle mb-0" id="table-master-produk">
                   <thead class="table-light small">
                     <tr>
-                      <th class="ps-3">Foto</th>
+                      <th class="ps-3 text-center" style="width: 40px;">
+                        <input type="checkbox" id="prod-select-all" class="form-check-input" onchange="MasterProduk.toggleSelectAll(this)" title="Pilih Semua Produk">
+                      </th>
+                      <th class="text-center" style="width: 45px;">Foto</th>
                       <th>Kode</th>
                       <th>Nama Produk</th>
                       <th>Kategori</th>

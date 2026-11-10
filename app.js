@@ -1410,7 +1410,8 @@ const MasterProduk = {
 
     const tbody = document.getElementById('master-produk-tbody');
     if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">Belum ada data produk atau tidak sesuai pencarian.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4 text-muted">Belum ada data produk atau tidak sesuai pencarian.</td></tr>';
+      this.updateBulkActionUI();
       return;
     }
 
@@ -1420,7 +1421,10 @@ const MasterProduk = {
       const isLow = p.stock > 0 && p.stock <= p.min_stock;
       return `
         <tr>
-          <td class="ps-3 text-center">
+          <td class="ps-3 text-center" style="width: 40px;">
+            <input type="checkbox" class="form-check-input prod-row-check" value="${p.id}" onchange="MasterProduk.updateBulkActionUI()">
+          </td>
+          <td class="text-center" style="width: 45px;">
             ${p.image ? `<img src="${p.image}" class="rounded border" style="width: 32px; height: 32px; object-fit: cover;">` : `<i class="bi bi-image text-muted fs-5"></i>`}
           </td>
           <td class="fw-bold text-secondary">${p.code}</td>
@@ -1445,6 +1449,8 @@ const MasterProduk = {
         </tr>
       `;
     }).join('');
+
+    this.updateBulkActionUI();
   },
 
   async openModal(id = null) {
@@ -1651,6 +1657,180 @@ const MasterProduk = {
       await this.renderTable();
       await POS.renderProducts();
       await App.refreshDashboard();
+    }
+  },
+
+  toggleSelectAll(masterCheckbox) {
+    const isChecked = masterCheckbox.checked;
+    document.querySelectorAll('.prod-row-check').forEach(cb => {
+      cb.checked = isChecked;
+    });
+    this.updateBulkActionUI();
+  },
+
+  updateBulkActionUI() {
+    const checked = document.querySelectorAll('.prod-row-check:checked');
+    const btn = document.getElementById('btn-delete-selected');
+    const countEl = document.getElementById('count-selected');
+    const masterCb = document.getElementById('prod-select-all');
+    
+    if (countEl) countEl.textContent = checked.length;
+    if (btn) {
+      if (checked.length > 0) btn.classList.remove('d-none');
+      else btn.classList.add('d-none');
+    }
+
+    const allCheckboxes = document.querySelectorAll('.prod-row-check');
+    if (masterCb && allCheckboxes.length > 0) {
+      masterCb.checked = (checked.length === allCheckboxes.length);
+    }
+  },
+
+  async deleteSelectedProducts() {
+    const checked = Array.from(document.querySelectorAll('.prod-row-check:checked')).map(cb => parseInt(cb.value));
+    if (checked.length === 0) return;
+
+    if (!confirm(`Hapus ${checked.length} produk yang dipilih sekaligus?\n\nProduk yang dihapus akan langsung dibersihkan dari kasir dan database cloud.`)) {
+      return;
+    }
+
+    if (window.CloudDB) window.CloudDB.isSyncing = true;
+    try {
+      for (const id of checked) {
+        await db.delete('products', id);
+      }
+      alert(`✅ Berhasil menghapus ${checked.length} produk!`);
+      await this.renderTable();
+      await StokBarang.renderTable();
+      await POS.renderProducts();
+      await App.refreshDashboard();
+    } catch (e) {
+      alert('Gagal menghapus: ' + e.message);
+    } finally {
+      if (window.CloudDB) window.CloudDB.isSyncing = false;
+    }
+  },
+
+  async cleanDuplicates() {
+    const localProducts = await new Promise((resolve) => {
+      const s = db.tx('products', 'readonly');
+      const r = s.getAll();
+      r.onsuccess = () => resolve(r.result || []);
+      r.onerror = () => resolve([]);
+    });
+
+    if (localProducts.length === 0) {
+      alert('Tidak ada produk dalam database.');
+      return;
+    }
+
+    const seen = new Map();
+    const duplicatesToDelete = [];
+
+    for (const p of localProducts) {
+      const key = (p.code || p.name || '').toLowerCase().trim();
+      if (!key) continue;
+      if (seen.has(key)) {
+        duplicatesToDelete.push(p.id);
+      } else {
+        seen.set(key, p);
+      }
+    }
+
+    if (duplicatesToDelete.length === 0) {
+      alert('Katalog produk Anda sudah bersih! Tidak ada produk kembar/duplikat.');
+      return;
+    }
+
+    const conf = confirm(
+      `PEMBERSIHAN DUPLIKAT OTOMATIS:\n\n` +
+      `Ditemukan ${duplicatesToDelete.length} produk kembar/duplikat dari total ${localProducts.length} data!\n\n` +
+      `• Sistem akan menghapus data yang menumpuk dan menyisakan ${seen.size} produk asli yang unik.\n` +
+      `• Stok dan harga tetap aman mengikuti data asli.\n\n` +
+      `Lanjutkan pembersihan duplikat?`
+    );
+    if (!conf) return;
+
+    if (window.CloudDB) window.CloudDB.isSyncing = true;
+    try {
+      // 1. Hapus ID duplikat dari lokal IndexedDB
+      for (const id of duplicatesToDelete) {
+        await new Promise((res) => {
+          const s = db.tx('products', 'readwrite');
+          const r = s.delete(id);
+          r.onsuccess = () => res(true);
+          r.onerror = () => res(false);
+        });
+      }
+
+      // 2. Sinkronkan katalog bersih ke Supabase Cloud
+      if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+        await window.CloudDB.client.from('products').delete().neq('id', 0);
+        const cleanList = Array.from(seen.values()).map(p => {
+          const c = { ...p };
+          delete c.id;
+          return c;
+        });
+        const insertedAll = [];
+        for (let i = 0; i < cleanList.length; i += 50) {
+          const chunk = cleanList.slice(i, i + 50);
+          const { data: ins, error } = await window.CloudDB.client.from('products').insert(chunk).select();
+          if (!error && Array.isArray(ins)) {
+            insertedAll.push(...ins);
+          }
+        }
+        if (insertedAll.length > 0) {
+          await db.clear('products');
+          for (const item of insertedAll) {
+            await db.putLocal('products', item);
+          }
+        }
+      }
+
+      alert(`✅ SUKSES BESAR!\n\nBerhasil menghapus ${duplicatesToDelete.length} data produk duplikat yang menumpuk!\nKini tersisa ${seen.size} produk unik yang rapi dan tersinkron sempurna.`);
+      await this.renderTable();
+      await StokBarang.renderTable();
+      await POS.renderProducts();
+      await App.refreshDashboard();
+    } catch (err) {
+      alert('Gagal membersihkan: ' + err.message);
+    } finally {
+      if (window.CloudDB) window.CloudDB.isSyncing = false;
+    }
+  },
+
+  async deleteAllProducts() {
+    const products = await db.getAll('products');
+    if (products.length === 0) {
+      alert('Katalog produk sudah kosong.');
+      return;
+    }
+
+    const conf = confirm(
+      `HAPUS SEMUA PRODUK (KOSONGKAN TOTAL):\n\n` +
+      `Apakah Anda yakin ingin MENGHAPUS SEMUA (${products.length}) produk sekaligus?\n\n` +
+      `• Seluruh produk yang menumpuk di komputer, HP, dan Cloud Supabase akan dikosongkan.\n` +
+      `• Setelah dikosongkan, Anda dapat langsung mengklik tombol "Import Excel" untuk memasukkan file Excel Anda yang bersih.\n\n` +
+      `Lanjutkan pengosongan total?`
+    );
+    if (!conf) return;
+
+    if (window.CloudDB) window.CloudDB.isSyncing = true;
+    try {
+      if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
+        await window.CloudDB.client.from('products').delete().neq('id', 0);
+      }
+      await db.clear('products');
+
+      alert('✅ Seluruh produk berhasil dikosongkan!\n\nSekarang silakan klik tombol hijau "Import Excel" untuk memasukkan data bersih Anda.');
+      await this.renderTable();
+      await StokBarang.renderTable();
+      await POS.renderProducts();
+      await App.refreshDashboard();
+    } catch (err) {
+      alert('Gagal mengosongkan: ' + err.message);
+    } finally {
+      if (window.CloudDB) window.CloudDB.isSyncing = false;
     }
   },
 

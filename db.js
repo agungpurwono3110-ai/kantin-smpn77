@@ -167,15 +167,41 @@ const CloudDB = {
             await this.client.from(store).delete().neq('id', 0);
           }
 
-          const batch = localItems.map(item => {
+          // Khusus produk: deduplikasi dulu agar data ganda/tumpuk bersih total
+          let itemsToUpload = localItems;
+          if (store === 'products') {
+            const seen = new Set();
+            itemsToUpload = [];
+            for (const item of localItems) {
+              const key = (item.code || item.name || '').toLowerCase().trim();
+              if (key && !seen.has(key)) {
+                seen.add(key);
+                itemsToUpload.push(item);
+              }
+            }
+          }
+
+          const batch = itemsToUpload.map(item => {
             const copy = { ...item };
             delete copy.id;
             return copy;
           });
 
+          const insertedAll = [];
           for (let i = 0; i < batch.length; i += 50) {
             const chunk = batch.slice(i, i + 50);
-            await this.client.from(store).insert(chunk);
+            const { data: inserted, error } = await this.client.from(store).insert(chunk).select();
+            if (!error && Array.isArray(inserted)) {
+              insertedAll.push(...inserted);
+            }
+          }
+
+          // Perbarui data lokal dengan ID resmi dari cloud agar tidak pernah terjadi data kembar lagi
+          if (insertedAll.length > 0) {
+            await db.clear(store);
+            for (const item of insertedAll) {
+              await db.putLocal(store, item);
+            }
           }
         }
       }
@@ -386,15 +412,31 @@ class CanteenDB {
         const orderCol = storeName === 'settings' ? 'key' : 'id';
         const { data, error } = await window.CloudDB.client.from(storeName).select('*').order(orderCol, { ascending: true });
         if (!error && Array.isArray(data) && data.length > 0) {
-          // Sinkronkan pembaruan dari cloud ke lokal secara aman (tanpa menghapus data lokal lainnya)
+          // Sinkronkan pembaruan dari cloud ke lokal secara aman
           for (const item of data) {
             await this.putLocal(storeName, item);
           }
-          // Kembalikan gabungan lengkap dari penyimpanan lokal agar tidak ada produk yang hilang
+          // Kembalikan gabungan lengkap dari penyimpanan lokal dengan anti-duplikasi otomatis
           return new Promise((resolve) => {
             const store = this.tx(storeName, 'readonly');
             const req = store.getAll();
-            req.onsuccess = () => resolve(req.result || data);
+            req.onsuccess = () => {
+              const res = req.result || data;
+              if (storeName === 'products') {
+                const seen = new Set();
+                const unique = [];
+                for (const p of res) {
+                  const key = (p.code || p.name || String(p.id)).toLowerCase().trim();
+                  if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.push(p);
+                  }
+                }
+                resolve(unique);
+              } else {
+                resolve(res);
+              }
+            };
             req.onerror = () => resolve(data);
           });
         }
@@ -405,7 +447,23 @@ class CanteenDB {
     return new Promise((resolve, reject) => {
       const store = this.tx(storeName, 'readonly');
       const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
+      req.onsuccess = () => {
+        const res = req.result || [];
+        if (storeName === 'products') {
+          const seen = new Set();
+          const unique = [];
+          for (const p of res) {
+            const key = (p.code || p.name || String(p.id)).toLowerCase().trim();
+            if (!seen.has(key)) {
+              seen.add(key);
+              unique.push(p);
+            }
+          }
+          resolve(unique);
+        } else {
+          resolve(res);
+        }
+      };
       req.onerror = () => reject(req.error);
     });
   }
