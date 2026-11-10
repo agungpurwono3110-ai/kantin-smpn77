@@ -2157,9 +2157,14 @@ const StokOpname = {
         savedItem = existingDraft.items.find(i => i.productId === p.id);
       }
 
-      const fisikStock = savedItem ? savedItem.physical_stock : p.stock;
+      let fisikStock = p.stock;
+      if (savedItem) {
+        if (savedItem.fisikStock !== undefined) fisikStock = savedItem.fisikStock;
+        else if (savedItem.physical_stock !== undefined) fisikStock = savedItem.physical_stock;
+      }
+      fisikStock = parseNumber(fisikStock);
       const selisih = fisikStock - sistemStock;
-      const diffReason = savedItem ? savedItem.diff_reason : 'Cocok';
+      const diffReason = savedItem ? (savedItem.diffReason || savedItem.diff_reason || 'Cocok') : 'Cocok';
 
       return {
         no: idx + 1,
@@ -2357,13 +2362,19 @@ const StokOpname = {
 
       // 3. Update physical stock in products store
       // Sesuai aturan: Stok fisik akhir menjadi stok awal hari berikutnya!
-      for (const item of this.currentOpnameItems) {
-        const prod = await db.get('products', item.productId);
-        if (prod) {
-          prod.stock = item.fisikStock;
-          prod.initial_stock = item.fisikStock; // Rollover for tomorrow
-          await db.put('products', prod);
+      if (window.CloudDB) window.CloudDB.isSyncing = true;
+      try {
+        for (const item of this.currentOpnameItems) {
+          const prod = await db.get('products', item.productId);
+          if (prod) {
+            const validStock = (typeof item.fisikStock === 'number' && !isNaN(item.fisikStock)) ? item.fisikStock : (prod.stock || 0);
+            prod.stock = validStock;
+            prod.initial_stock = validStock; // Rollover for tomorrow
+            await db.put('products', prod);
+          }
         }
+      } finally {
+        if (window.CloudDB) window.CloudDB.isSyncing = false;
       }
 
       // 4. Save Daily Closure Archive

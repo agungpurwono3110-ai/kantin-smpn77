@@ -16,6 +16,7 @@ window.SUPABASE_CONFIG = SUPABASE_CONFIG;
 const CloudDB = {
   client: null,
   isOnline: false,
+  isSyncing: false,
   lastError: null,
   retryCount: 0,
 
@@ -109,8 +110,10 @@ const CloudDB = {
     try {
       let syncTimer = null;
       const debouncedRefresh = () => {
+        if (CloudDB.isSyncing) return;
         clearTimeout(syncTimer);
         syncTimer = setTimeout(async () => {
+          if (CloudDB.isSyncing) return;
           console.log('⚡ Pembaruan diterima dari Cloud Supabase! Memperbarui tampilan...');
           if (window.MasterProduk) await MasterProduk.renderTable();
           if (window.POS) await POS.renderProducts();
@@ -383,12 +386,17 @@ class CanteenDB {
         const orderCol = storeName === 'settings' ? 'key' : 'id';
         const { data, error } = await window.CloudDB.client.from(storeName).select('*').order(orderCol, { ascending: true });
         if (!error && Array.isArray(data) && data.length > 0) {
-          // Bersihkan data lokal lama agar data HP dan PC selalu 100% sinkron
-          await this.clear(storeName);
+          // Sinkronkan pembaruan dari cloud ke lokal secara aman (tanpa menghapus data lokal lainnya)
           for (const item of data) {
             await this.putLocal(storeName, item);
           }
-          return data;
+          // Kembalikan gabungan lengkap dari penyimpanan lokal agar tidak ada produk yang hilang
+          return new Promise((resolve) => {
+            const store = this.tx(storeName, 'readonly');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || data);
+            req.onerror = () => resolve(data);
+          });
         }
       } catch (e) {
         console.warn(`CloudDB getAll failed for ${storeName}:`, e);
