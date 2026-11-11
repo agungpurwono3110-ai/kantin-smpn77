@@ -270,7 +270,7 @@
             <i class="bi bi-arrow-repeat me-1"></i> Sinkron Data
           </button>
           <!-- Quick Cash Summary Pill -->
-          <div class="quick-cash-pill px-3 py-1 bg-success-subtle border border-success-subtle rounded-pill text-success small fw-semibold">
+          <div class="quick-cash-pill px-3 py-1 bg-success-subtle border border-success-subtle rounded-pill text-success small fw-semibold" style="cursor: pointer;" onclick="App.navigate('kas-harian')" title="Klik untuk membuka menu Kas Harian">
             <i class="bi bi-cash-stack me-1"></i> Kas Hari Ini: <span id="top-quick-cash">Rp 0</span>
           </div>
           <!-- POS Shortcut Button -->
@@ -925,21 +925,31 @@
           <!-- Kas Summary Cards -->
           <div class="row g-3 mb-4">
             <div class="col-md-4">
-              <div class="card border-0 shadow-sm bg-white p-3">
-                <div class="text-muted small fw-semibold">Saldo Awal Kas</div>
+              <div class="card border-0 shadow-sm bg-white p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="text-muted small fw-semibold">Saldo Awal Kas</div>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary btn-sm py-0 px-2 fw-semibold" style="font-size: 11px;" onclick="KasHarian.editSaldoAwalPrompt()" title="Ubah Saldo Awal Kas">
+                      <i class="bi bi-pencil me-1"></i>Edit
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm py-0 px-2 fw-semibold" style="font-size: 11px;" onclick="KasHarian.resetSaldoAwalPrompt()" title="Hapus / Reset Saldo Awal ke Rp 0">
+                      <i class="bi bi-trash me-1"></i>Hapus
+                    </button>
+                  </div>
+                </div>
                 <h4 class="fw-bold text-dark mb-0" id="kas-saldo-awal">Rp 0</h4>
-                <small class="text-muted">Modal kas awal hari</small>
+                <small class="text-muted">Modal kas awal hari (uang kembalian)</small>
               </div>
             </div>
             <div class="col-md-4">
-              <div class="card border-0 shadow-sm bg-white p-3">
+              <div class="card border-0 shadow-sm bg-white p-3 h-100">
                 <div class="text-muted small fw-semibold">Total Pemasukan Kas Hari Ini</div>
                 <h4 class="fw-bold text-success mb-0" id="kas-total-in">Rp 0</h4>
                 <small class="text-muted">(Tunai: <span id="kas-penjualan-tunai">Rp 0</span> | Lainnya: <span id="kas-in-lain">Rp 0</span>)</small>
               </div>
             </div>
             <div class="col-md-4">
-              <div class="card border-0 shadow-sm bg-white p-3">
+              <div class="card border-0 shadow-sm bg-white p-3 h-100">
                 <div class="text-muted small fw-semibold">Total Pengeluaran Kas Hari Ini</div>
                 <h4 class="fw-bold text-danger mb-0" id="kas-total-out">Rp 0</h4>
                 <small class="text-muted">(Beli Stok: <span id="kas-beli-tunai">Rp 0</span> | Operasional: <span id="kas-ops">Rp 0</span>)</small>
@@ -949,14 +959,24 @@
 
           <div class="row g-3 mb-4">
             <div class="col-md-6">
-              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-success">
-                <div class="text-muted small fw-semibold">Saldo Kas Akhir (Uang Fisik di Laci)</div>
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-success h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="text-muted small fw-semibold">Saldo Kas Akhir (Uang Fisik di Laci)</div>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-success btn-sm py-0 px-2 fw-semibold" style="font-size: 11px;" onclick="KasHarian.koreksiSaldoAkhirPrompt()" title="Edit / Set Saldo Kas Riil Sesuai Laci">
+                      <i class="bi bi-pencil-square me-1"></i>Edit / Set Saldo
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm py-0 px-2 fw-semibold" style="font-size: 11px;" onclick="KasHarian.resetKasHariIniPrompt()" title="Hapus / Bersihkan Mutasi Kas Hari Ini">
+                      <i class="bi bi-trash me-1"></i>Hapus Kas
+                    </button>
+                  </div>
+                </div>
                 <h3 class="fw-bold text-success mb-1" id="kas-saldo-akhir">Rp 0</h3>
                 <small class="text-muted">Rumus: Saldo Awal + Penerimaan Tunai - Pengeluaran Tunai</small>
               </div>
             </div>
             <div class="col-md-6">
-              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-info">
+              <div class="card border-0 shadow-sm bg-white p-3 border-start border-4 border-info h-100">
                 <div class="text-muted small fw-semibold">Penerimaan Non-Tunai (QRIS / Transfer)</div>
                 <h3 class="fw-bold text-info mb-1" id="kas-saldo-nontunai">Rp 0</h3>
                 <small class="text-muted">Tersimpan di rekening / dompet digital sekolah</small>
@@ -979,8 +999,9 @@
           </div>
 
           <div class="card border-0 shadow-sm bg-white">
-            <div class="card-header bg-white py-3 border-bottom">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
               <h6 class="fw-bold mb-0 text-navy">Buku Kas & Riwayat Aliran Kas</h6>
+              <span class="small text-muted">Setiap baris mutasi kas dapat diedit atau dihapus</span>
             </div>
             <div class="card-body p-0">
               <div class="table-responsive">
@@ -993,7 +1014,8 @@
                       <th>Deskripsi / Catatan</th>
                       <th class="text-end">Jumlah Masuk</th>
                       <th class="text-end">Jumlah Keluar</th>
-                      <th class="text-end pe-3">Saldo Berjalan</th>
+                      <th class="text-end">Saldo Berjalan</th>
+                      <th class="text-end pe-3">Aksi</th>
                     </tr>
                   </thead>
                   <tbody id="kas-mutasi-tbody" class="small">
@@ -1971,6 +1993,7 @@ Selamat belajar di SMPN 77.</textarea>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <form id="form-kas-manual" onsubmit="KasHarian.saveManualEntry(event)">
+          <input type="hidden" id="kas-manual-id">
           <input type="hidden" id="kas-manual-type" value="in">
           <div class="modal-body p-4">
             <div class="mb-3">

@@ -415,12 +415,15 @@ const App = {
     // 4. Kas Harian Balance
     const mutations = await db.getAll('cash_mutations');
     const todayMutations = mutations.filter(m => m.date === today);
+    const defaultInitialCash = await db.getSetting('default_initial_cash', 200000);
+    const modalMut = todayMutations.find(m => m.category === 'modal_awal');
+    const saldoAwal = modalMut ? modalMut.amount : defaultInitialCash;
     
-    let cashBalance = 0;
-    let cashTunai = 0;
+    let cashTunai = saldoAwal;
     let cashNonTunai = 0;
 
     todayMutations.forEach(m => {
+      if (m.category === 'modal_awal') return; // Sudah dihitung sebagai saldoAwal
       if (m.type === 'in') {
         if (m.payment_method === 'tunai') cashTunai += m.amount;
         else cashNonTunai += m.amount;
@@ -2721,7 +2724,7 @@ const KasHarian = {
 
     const tbody = document.getElementById('kas-mutasi-tbody');
     if (dayMutations.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">Belum ada mutasi kas pada tanggal ini.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Belum ada mutasi kas pada tanggal ini.</td></tr>';
     } else {
       tbody.innerHTML = dayMutations.map(m => {
         const isTunai = m.payment_method === 'tunai';
@@ -2751,11 +2754,19 @@ const KasHarian = {
                 ${m.type === 'in' ? 'Masuk' : 'Keluar'}
               </span>
             </td>
-            <td><span class="badge bg-light text-secondary border text-capitalize">${m.category.replace(/_/g, ' ')}</span></td>
-            <td class="small fw-semibold text-navy">${m.description}</td>
+            <td><span class="badge bg-light text-secondary border text-capitalize">${(m.category || '').replace(/_/g, ' ')}</span></td>
+            <td class="small fw-semibold text-navy">${m.description || '-'}</td>
             <td class="text-end text-success fw-bold">${m.type === 'in' ? formatRupiah(m.amount) : '-'}</td>
             <td class="text-end text-danger fw-bold">${m.type === 'out' ? formatRupiah(m.amount) : '-'}</td>
-            <td class="text-end pe-3 fw-bold text-navy">${isTunai ? formatRupiah(runningBalance) : '<span class="text-muted small">Non-Tunai</span>'}</td>
+            <td class="text-end fw-bold text-navy">${isTunai ? formatRupiah(runningBalance) : '<span class="text-muted small">Non-Tunai</span>'}</td>
+            <td class="text-end pe-3 text-nowrap">
+              <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="KasHarian.editMutation(${m.id})" title="Edit Catatan Kas">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="KasHarian.deleteMutation(${m.id})" title="Hapus Catatan Kas">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
           </tr>
         `;
       }).join('');
@@ -2776,7 +2787,195 @@ const KasHarian = {
     document.getElementById('kas-saldo-nontunai').textContent = formatRupiah(nonTunai);
   },
 
+  async editSaldoAwalPrompt() {
+    const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
+    const mutations = await db.getAll('cash_mutations');
+    const dayMutations = mutations.filter(m => m.date === filterDate);
+    const defaultInitialCash = await db.getSetting('default_initial_cash', 200000);
+    const modalMut = dayMutations.find(m => m.category === 'modal_awal');
+    const curAwal = modalMut ? modalMut.amount : defaultInitialCash;
+
+    const val = prompt(
+      `UBAH SALDO AWAL KAS (MODAL KEMBALIAN):\n\nTanggal: ${formatDateIndo(filterDate)}\nSaldo Awal saat ini: ${formatRupiah(curAwal)}\n\nMasukkan nominal Saldo Awal Kas yang baru (Rp):`,
+      curAwal
+    );
+    if (val === null) return;
+    const newAmount = parseNumber(val);
+    if (isNaN(newAmount) || newAmount < 0) {
+      alert('Nominal harus berupa angka 0 atau lebih!');
+      return;
+    }
+
+    if (modalMut) {
+      modalMut.amount = newAmount;
+      await db.put('cash_mutations', modalMut);
+    } else {
+      await db.add('cash_mutations', {
+        date: filterDate,
+        time: '06:30',
+        timestamp: new Date(filterDate + 'T06:30:00').getTime() || Date.now(),
+        type: 'in',
+        category: 'modal_awal',
+        payment_method: 'tunai',
+        amount: newAmount,
+        description: 'Modal awal uang kembalian kasir'
+      });
+    }
+
+    const setAsDefault = confirm(`Jadikan ${formatRupiah(newAmount)} sebagai modal kas awal default untuk hari-hari berikutnya?`);
+    if (setAsDefault) {
+      await db.setSetting('default_initial_cash', newAmount);
+    }
+
+    alert(`✅ Saldo Awal Kas tanggal ${formatDateIndo(filterDate)} berhasil diubah menjadi ${formatRupiah(newAmount)}!`);
+    await this.renderTable();
+    await App.refreshDashboard();
+  },
+
+  async resetSaldoAwalPrompt() {
+    const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
+    if (!confirm(`HAPUS / RESET SALDO AWAL KAS:\n\nApakah Anda yakin ingin menghapus / mereset Saldo Awal Kas pada tanggal ${formatDateIndo(filterDate)} menjadi Rp 0?`)) {
+      return;
+    }
+
+    const mutations = await db.getAll('cash_mutations');
+    const modalMuts = mutations.filter(m => m.date === filterDate && m.category === 'modal_awal');
+    for (const m of modalMuts) {
+      await db.delete('cash_mutations', m.id);
+    }
+
+    // Rekam modal_awal = 0 agar sistem tahu tanggal ini saldo awalnya 0
+    await db.add('cash_mutations', {
+      date: filterDate,
+      time: '06:30',
+      timestamp: new Date(filterDate + 'T06:30:00').getTime() || Date.now(),
+      type: 'in',
+      category: 'modal_awal',
+      payment_method: 'tunai',
+      amount: 0,
+      description: 'Modal awal uang kembalian kasir (Reset ke Rp 0)'
+    });
+
+    alert(`✅ Saldo Awal Kas tanggal ${formatDateIndo(filterDate)} telah direset menjadi Rp 0.`);
+    await this.renderTable();
+    await App.refreshDashboard();
+  },
+
+  async koreksiSaldoAkhirPrompt() {
+    const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
+    const curSaldoAkhirText = document.getElementById('kas-saldo-akhir').textContent;
+    const curSaldoAkhir = parseNumber(curSaldoAkhirText.replace(/[^0-9]/g, ''));
+
+    const val = prompt(
+      `EDIT / KOREKSI SALDO KAS AKHIR:\n\nTanggal: ${formatDateIndo(filterDate)}\nSaldo Kas Akhir Sistem saat ini: ${formatRupiah(curSaldoAkhir)}\n\nMasukkan jumlah UANG FISIK RIIL yang ada di laci kasir saat ini (Rp):`,
+      curSaldoAkhir
+    );
+    if (val === null) return;
+    const targetFisik = parseNumber(val);
+    if (isNaN(targetFisik) || targetFisik < 0) {
+      alert('Nominal uang fisik harus berupa angka 0 atau lebih!');
+      return;
+    }
+
+    const selisih = targetFisik - curSaldoAkhir;
+    if (selisih === 0) {
+      alert(`Saldo kas sistem sudah persis sama dengan uang fisik di laci (${formatRupiah(targetFisik)}). Tidak ada penyesuaian yang diperlukan.`);
+      return;
+    }
+
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+    if (selisih > 0) {
+      await db.add('cash_mutations', {
+        date: filterDate,
+        time: timeStr,
+        timestamp: now.getTime(),
+        type: 'in',
+        category: 'penyesuaian_kas',
+        payment_method: 'tunai',
+        amount: selisih,
+        description: `Penyesuaian saldo kas fisik riil (+${formatRupiah(selisih)})`,
+        ref_id: `KOR-${now.getTime().toString().slice(-4)}`
+      });
+      alert(`✅ Berhasil! Saldo kas disesuaikan (+${formatRupiah(selisih)}). Saldo Kas Akhir sekarang menjadi ${formatRupiah(targetFisik)}.`);
+    } else {
+      const absDiff = Math.abs(selisih);
+      await db.add('cash_mutations', {
+        date: filterDate,
+        time: timeStr,
+        timestamp: now.getTime(),
+        type: 'out',
+        category: 'penyesuaian_kas',
+        payment_method: 'tunai',
+        amount: absDiff,
+        description: `Penyesuaian saldo kas fisik riil (-${formatRupiah(absDiff)})`,
+        ref_id: `KOR-${now.getTime().toString().slice(-4)}`
+      });
+      alert(`✅ Berhasil! Saldo kas disesuaikan (-${formatRupiah(absDiff)}). Saldo Kas Akhir sekarang menjadi ${formatRupiah(targetFisik)}.`);
+    }
+
+    await this.renderTable();
+    await App.refreshDashboard();
+  },
+
+  async resetKasHariIniPrompt() {
+    const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
+    if (!confirm(
+      `PERINGATAN BERSIHKAN / HAPUS KAS:\n\nApakah Anda yakin ingin MENGHAPUS seluruh mutasi kas pada tanggal ${formatDateIndo(filterDate)}?\n\n• Semua catatan kas masuk & kas keluar pada tanggal ini akan dibersihkan.\n• Saldo Kas Akhir akan kembali ke Rp 0.\n\nLanjutkan?`
+    )) {
+      return;
+    }
+
+    const mutations = await db.getAll('cash_mutations');
+    const dayMutations = mutations.filter(m => m.date === filterDate);
+    for (const m of dayMutations) {
+      await db.delete('cash_mutations', m.id);
+    }
+
+    alert(`✅ Seluruh mutasi kas pada tanggal ${formatDateIndo(filterDate)} telah berhasil dibersihkan!`);
+    await this.renderTable();
+    await App.refreshDashboard();
+  },
+
+  async deleteMutation(id) {
+    const m = await db.get('cash_mutations', id);
+    if (!m) return;
+    if (!confirm(
+      `HAPUS CATATAN MUTASI KAS:\n\nApakah Anda yakin ingin menghapus catatan kas ini?\n• Jenis: ${m.type === 'in' ? 'Kas Masuk' : 'Kas Keluar'}\n• Nominal: ${formatRupiah(m.amount)}\n• Keterangan: ${m.description}\n• Tanggal: ${formatDateIndo(m.date)}`
+    )) {
+      return;
+    }
+
+    await db.delete('cash_mutations', id);
+    alert('✅ Catatan mutasi kas berhasil dihapus!');
+    await this.renderTable();
+    await App.refreshDashboard();
+  },
+
+  async editMutation(id) {
+    const m = await db.get('cash_mutations', id);
+    if (!m) return;
+    if (m.category === 'modal_awal') {
+      await this.editSaldoAwalPrompt();
+      return;
+    }
+
+    document.getElementById('kas-manual-id').value = m.id;
+    document.getElementById('kas-manual-type').value = m.type;
+    document.getElementById('kas-manual-date').value = m.date;
+    document.getElementById('kas-manual-amount').value = m.amount;
+    document.getElementById('kas-manual-desc').value = m.description || '';
+
+    const titleEl = document.getElementById('modal-kas-title');
+    titleEl.innerHTML = `<i class="bi bi-pencil-square me-2 text-primary"></i>Edit Mutasi Kas (${m.type === 'in' ? 'Kas Masuk' : 'Kas Keluar'})`;
+
+    const modal = new bootstrap.Modal(document.getElementById('modal-kas-manual'));
+    modal.show();
+  },
+
   openModal(type) {
+    document.getElementById('kas-manual-id').value = '';
     document.getElementById('kas-manual-type').value = type;
     document.getElementById('kas-manual-date').value = App.operationalDate;
     document.getElementById('kas-manual-amount').value = '';
@@ -2795,6 +2994,7 @@ const KasHarian = {
 
   async saveManualEntry(e) {
     e.preventDefault();
+    const editId = document.getElementById('kas-manual-id').value;
     const type = document.getElementById('kas-manual-type').value;
     const date = document.getElementById('kas-manual-date').value;
     const amount = parseNumber(document.getElementById('kas-manual-amount').value);
@@ -2805,18 +3005,32 @@ const KasHarian = {
       return;
     }
 
-    const now = new Date();
-    await db.add('cash_mutations', {
-      date,
-      time: now.toTimeString().split(' ')[0].substring(0, 5),
-      timestamp: now.getTime(),
-      type,
-      category: type === 'in' ? 'manual_in' : 'manual_out',
-      payment_method: 'tunai',
-      amount,
-      description: desc,
-      ref_id: `MANUAL-${now.getTime().toString().slice(-4)}`
-    });
+    if (editId) {
+      const id = parseInt(editId, 10);
+      const m = await db.get('cash_mutations', id);
+      if (m) {
+        m.type = type;
+        m.date = date;
+        m.amount = amount;
+        m.description = desc;
+        await db.put('cash_mutations', m);
+        alert('✅ Catatan mutasi kas berhasil diperbarui!');
+      }
+    } else {
+      const now = new Date();
+      await db.add('cash_mutations', {
+        date,
+        time: now.toTimeString().split(' ')[0].substring(0, 5),
+        timestamp: now.getTime(),
+        type,
+        category: type === 'in' ? 'manual_in' : 'manual_out',
+        payment_method: 'tunai',
+        amount,
+        description: desc,
+        ref_id: `MANUAL-${now.getTime().toString().slice(-4)}`
+      });
+      alert('✅ Catatan kas berhasil disimpan!');
+    }
 
     bootstrap.Modal.getInstance(document.getElementById('modal-kas-manual'))?.hide();
     await this.renderTable();
@@ -2973,6 +3187,7 @@ const HutangSupplier = {
               </span>
             </td>
             <td class="text-end pe-3">
+
               ${!isLunas ? `
                 <button class="btn btn-sm btn-success py-0 px-2 fw-semibold" onclick="HutangSupplier.openPayModal(${d.id})">
                   <i class="bi bi-cash me-1"></i> Bayar
