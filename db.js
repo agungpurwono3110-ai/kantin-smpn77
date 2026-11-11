@@ -285,7 +285,7 @@ const CloudDB = {
 
       for (const store of stores) {
         const { data, error } = await this.client.from(store).select('*').order(store === 'settings' ? 'key' : 'id', { ascending: true });
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (!error && Array.isArray(data)) {
           await db.clear(store);
           for (const item of data) {
             await db.putLocal(store, item);
@@ -307,17 +307,21 @@ const CloudDB = {
       this.showDiagnosticAlert();
       return;
     }
+    const modalEl = document.getElementById('modal-sync-choice');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+      return;
+    }
     const choice = confirm(
       'SINKRONISASI DATA KANTIN 77 (HP & KOMPUTER)\n\n' +
-      '• Klik [OK] untuk JADIKAN DATA PERANGKAT INI SEBAGAI ACUAN UTAMA\n' +
-      '  (Data di perangkat ini akan dikirim ke Cloud agar perangkat lain mengikuti)\n\n' +
-      '• Klik [BATAL / Cancel] untuk TARIK DATA TERBARU DARI CLOUD\n' +
-      '  (Perangkat ini akan mengambil data terbaru yang ada di Cloud)'
+      '• Klik [OK] untuk TARIK DATA TERBARU DARI CLOUD (Update HP / Kasir)\n' +
+      '• Klik [BATAL] untuk UNGGAH DATA PERANGKAT INI KE CLOUD (Jadikan Acuan Utama)'
     );
     if (choice) {
-      await this.forcePushAllToCloud();
-    } else {
       await this.forcePullFromCloud();
+    } else {
+      await this.forcePushAllToCloud();
     }
   },
 
@@ -467,33 +471,25 @@ class CanteenDB {
         const orderCol = storeName === 'settings' ? 'key' : 'id';
         const { data, error } = await window.CloudDB.client.from(storeName).select('*').order(orderCol, { ascending: true });
         if (!error && Array.isArray(data) && data.length > 0) {
-          // Sinkronkan pembaruan dari cloud ke lokal secara aman
+          // Bersihkan data lokal lama & perbarui dengan data resmi dari Cloud
+          // Ini mencegah munculnya data 'hantu' atau sisa duplikat di HP
+          await this.clear(storeName);
           for (const item of data) {
             await this.putLocal(storeName, item);
           }
-          // Kembalikan gabungan lengkap dari penyimpanan lokal dengan anti-duplikasi otomatis
-          return new Promise((resolve) => {
-            const store = this.tx(storeName, 'readonly');
-            const req = store.getAll();
-            req.onsuccess = () => {
-              const res = req.result || data;
-              if (storeName === 'products') {
-                const seen = new Set();
-                const unique = [];
-                for (const p of res) {
-                  const key = (p.code || p.name || String(p.id)).toLowerCase().trim();
-                  if (!seen.has(key)) {
-                    seen.add(key);
-                    unique.push(p);
-                  }
-                }
-                resolve(unique);
-              } else {
-                resolve(res);
+          if (storeName === 'products') {
+            const seen = new Set();
+            const unique = [];
+            for (const p of data) {
+              const key = (p.code || p.name || String(p.id)).toLowerCase().trim();
+              if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(p);
               }
-            };
-            req.onerror = () => resolve(data);
-          });
+            }
+            return unique;
+          }
+          return data;
         }
       } catch (e) {
         console.warn(`CloudDB getAll failed for ${storeName}:`, e);

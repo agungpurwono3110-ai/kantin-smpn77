@@ -2115,6 +2115,48 @@ Selamat belajar di SMPN 77.</textarea>
     </div>
   </div>
 
+  <!-- 10. MODAL PILIHAN SINKRONISASI CLOUD -->
+  <div class="modal fade" id="modal-sync-choice" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-primary text-white py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-arrow-repeat me-2"></i>Sinkronisasi Cloud Terpusat</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="text-muted small mb-3">Pilih arah sinkronisasi untuk menyamakan data antara Komputer Admin dan HP Kasir:</p>
+          
+          <div class="d-grid gap-3">
+            <!-- Pilihan 1: Tarik Data (Wajib untuk HP / Kasir) -->
+            <button type="button" class="btn btn-outline-success p-3 text-start border-2 shadow-sm d-flex align-items-center gap-3" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-sync-choice'))?.hide(); CloudDB.forcePullFromCloud();">
+              <div class="rounded-circle bg-success text-white p-3 flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                <i class="bi bi-cloud-arrow-down-fill fs-4"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-success fs-6">1. TARIK DATA DARI CLOUD (Update HP / Kasir)</div>
+                <small class="text-muted">Ambil data produk & stok terbaru dari Cloud agar HP persis sama 100% dengan Komputer.</small>
+              </div>
+            </button>
+
+            <!-- Pilihan 2: Unggah Data (Untuk Komputer Admin) -->
+            <button type="button" class="btn btn-outline-primary p-3 text-start border-2 shadow-sm d-flex align-items-center gap-3" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-sync-choice'))?.hide(); CloudDB.forcePushAllToCloud();">
+              <div class="rounded-circle bg-primary text-white p-3 flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                <i class="bi bi-cloud-arrow-up-fill fs-4"></i>
+              </div>
+              <div>
+                <div class="fw-bold text-navy fs-6">2. UNGGAH DATA KE CLOUD (Jadikan Master Utama)</div>
+                <small class="text-muted">Kirim data dari perangkat ini ke Cloud Supabase agar perangkat lain mengikuti data ini.</small>
+              </div>
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer bg-light p-2 justify-content-center">
+          <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Di HP Kasir, selalu pilih tombol nomor 1: <b>"TARIK DATA DARI CLOUD"</b>.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- External JS Dependencies -->
   <!-- Supabase Cloud Database Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
