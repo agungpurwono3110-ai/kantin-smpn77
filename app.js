@@ -718,7 +718,7 @@ const POS = {
               Stok: ${p.stock}
             </span>
             <div class="pos-product-img rounded-2 mb-2">
-              ${p.image ? `<img src="${p.image}" alt="${p.name}" class="w-100 h-100 object-fit-cover rounded-2">` : `<i class="bi bi-cup-straw"></i>`}
+              ${p.image ? `<img src="${p.image}" alt="${p.name}" class="w-100 h-100 object-fit-cover rounded-2" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\\'bi bi-cup-straw\\\'></i>';">` : `<i class="bi bi-cup-straw"></i>`}
             </div>
             <div class="text-truncate fw-bold text-navy small mb-1" title="${p.name}">${p.name}</div>
             <div class="d-flex justify-content-between align-items-center">
@@ -1397,6 +1397,96 @@ const MasterProduk = {
     if (window.Rekap && typeof Rekap.loadCategories === 'function') await Rekap.loadCategories();
   },
 
+  async getUnits() {
+    const defaultUnits = ['Botol', 'Pcs', 'Bungkus', 'Cup', 'Kotak', 'Porsi', 'Sachet', 'Kaleng', 'Dus', 'Pack', 'Piring', 'Gelas'];
+    let customUnits = [];
+    try {
+      const stored = await db.getSetting('custom_units', '[]');
+      customUnits = typeof stored === 'string' ? JSON.parse(stored || '[]') : (stored || []);
+    } catch (e) {
+      customUnits = [];
+    }
+    const products = await db.getAll('products');
+    const fromProds = products.map(p => p.unit).filter(Boolean);
+    return Array.from(new Set([...defaultUnits, ...customUnits, ...fromProds]));
+  },
+
+  async loadUnitSelect(selectedVal = 'Botol') {
+    const select = document.getElementById('prod-unit');
+    if (!select) return;
+    const units = await this.getUnits();
+    select.innerHTML = units.map(u => `<option value="${u}">${u}</option>`).join('') +
+      '<option value="__NEW__" class="fw-bold text-primary">+ Tambah Satuan Baru...</option>';
+    if (selectedVal) {
+      select.value = selectedVal;
+    }
+  },
+
+  async handleUnitChange(selectEl) {
+    if (selectEl.value === '__NEW__') {
+      await this.addNewUnitPrompt();
+    }
+  },
+
+  async addNewUnitPrompt() {
+    const newUnit = prompt('MASUKKAN NAMA SATUAN BARANG BARU:\n\nContoh: Porsi, Sachet, Kaleng, Dus, Piring, Mangkok, Gelas, Pack');
+    if (!newUnit || !newUnit.trim()) {
+      const select = document.getElementById('prod-unit');
+      if (select && select.value === '__NEW__') select.value = 'Botol';
+      return;
+    }
+    const trimmed = newUnit.trim();
+    let customUnits = [];
+    try {
+      const stored = await db.getSetting('custom_units', '[]');
+      customUnits = typeof stored === 'string' ? JSON.parse(stored || '[]') : (stored || []);
+    } catch (e) {
+      customUnits = [];
+    }
+    if (!customUnits.includes(trimmed)) {
+      customUnits.push(trimmed);
+      await db.setSetting('custom_units', JSON.stringify(customUnits));
+    }
+    await this.loadUnitSelect(trimmed);
+  },
+
+  async compressImageString(dataUrl, maxDim = 320, quality = 0.8) {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+      return dataUrl;
+    }
+    if (dataUrl.length < 50000) return dataUrl; // Ukuran sudah ringan (< ~37KB)
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      } catch (e) {
+        resolve(dataUrl);
+      }
+    });
+  },
+
   async renderTable() {
     const products = await db.getAll('products');
     const searchVal = document.getElementById('prod-search').value.toLowerCase().trim();
@@ -1425,7 +1515,7 @@ const MasterProduk = {
             <input type="checkbox" class="form-check-input prod-row-check" value="${p.id}" onchange="MasterProduk.updateBulkActionUI()">
           </td>
           <td class="text-center" style="width: 45px;">
-            ${p.image ? `<img src="${p.image}" class="rounded border" style="width: 32px; height: 32px; object-fit: cover;">` : `<i class="bi bi-image text-muted fs-5"></i>`}
+            ${p.image ? `<img src="${p.image}" class="rounded border" style="width: 32px; height: 32px; object-fit: cover;" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\\'bi bi-image text-muted fs-5\\\'></i>';">` : `<i class="bi bi-image text-muted fs-5"></i>`}
           </td>
           <td class="fw-bold text-secondary">${p.code}</td>
           <td class="fw-semibold text-navy">${p.name}</td>
@@ -1461,6 +1551,7 @@ const MasterProduk = {
     document.getElementById('prod-image-preview-wrapper').style.display = 'none';
 
     let selectedCat = '';
+    let selectedUnit = 'Botol';
     if (id) {
       document.getElementById('modal-product-title').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Produk & Stok';
       const lblStock = document.getElementById('label-prod-stock');
@@ -1471,7 +1562,7 @@ const MasterProduk = {
         document.getElementById('prod-code').value = prod.code;
         document.getElementById('prod-name').value = prod.name;
         selectedCat = prod.category;
-        document.getElementById('prod-unit').value = prod.unit;
+        selectedUnit = prod.unit || 'Botol';
         document.getElementById('prod-buy-price').value = prod.buy_price;
         document.getElementById('prod-sell-price').value = prod.sell_price;
         document.getElementById('prod-initial-stock').value = prod.stock !== undefined ? prod.stock : (prod.initial_stock || 0);
@@ -1493,6 +1584,7 @@ const MasterProduk = {
     }
 
     await this.loadCategorySelect(selectedCat);
+    await this.loadUnitSelect(selectedUnit);
 
     const modal = new bootstrap.Modal(document.getElementById('modal-product'));
     modal.show();
@@ -1512,9 +1604,9 @@ const MasterProduk = {
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          // Kompresi & resize otomatis agar hemat memori & sinkronisasi cloud kilat
+          // Kompresi & resize otomatis agar hemat memori & sinkronisasi cloud kilat (<20KB)
           const canvas = document.createElement('canvas');
-          const maxDim = 400;
+          const maxDim = 320;
           let width = img.width;
           let height = img.height;
           if (width > height) {
@@ -1532,7 +1624,7 @@ const MasterProduk = {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
           document.getElementById('prod-image-data').value = compressedDataUrl;
           document.getElementById('prod-image-preview').src = compressedDataUrl;
           document.getElementById('prod-image-preview-wrapper').style.display = 'block';
@@ -1561,7 +1653,11 @@ const MasterProduk = {
     const sell_price = parseNumber(document.getElementById('prod-sell-price').value);
     const initial_stock = parseNumber(document.getElementById('prod-initial-stock').value);
     const min_stock = parseNumber(document.getElementById('prod-min-stock').value);
-    const image = document.getElementById('prod-image-data').value || null;
+    const rawImage = document.getElementById('prod-image-data').value || null;
+    let image = rawImage;
+    if (image && image.length > 50000) {
+      image = await this.compressImageString(image, 320, 0.78);
+    }
 
     if (sell_price < buy_price) {
       if (!confirm('Harga jual lebih kecil dari harga modal (potensi rugi). Lanjutkan menyimpan?')) return;
@@ -1580,7 +1676,7 @@ const MasterProduk = {
       prodObj.min_stock = min_stock;
       prodObj.stock = initial_stock;          // Perbarui stok langsung saat diedit
       prodObj.initial_stock = initial_stock;  // Perbarui stok awal
-      if (image) prodObj.image = image;
+      prodObj.image = image;
       await db.put('products', prodObj);
 
       if (window.API && window.API.isOnline) {
@@ -1606,6 +1702,13 @@ const MasterProduk = {
         image
       };
       const newId = await db.add('products', prodObj);
+      if (window.API && window.API.isOnline) {
+        await API.request('/api/products', {
+          method: 'POST',
+          body: JSON.stringify(prodObj)
+        });
+      }
+    }
       if (window.API && window.API.isOnline) {
         await API.request('/api/products', {
           method: 'POST',

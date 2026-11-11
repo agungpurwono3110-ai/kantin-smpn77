@@ -13,6 +13,44 @@ const SUPABASE_CONFIG = {
 };
 window.SUPABASE_CONFIG = SUPABASE_CONFIG;
 
+// Helper kompresi gambar base64 otomatis agar sinkronisasi cloud kilat (< 25KB per gambar)
+async function compressImageStringHelper(dataUrl, maxDim = 320, quality = 0.78) {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+    return dataUrl;
+  }
+  if (dataUrl.length < 50000) return dataUrl; // Sudah ringkas (< ~37KB)
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (e) {
+      resolve(dataUrl);
+    }
+  });
+}
+
 const CloudDB = {
   client: null,
   isOnline: false,
@@ -167,7 +205,7 @@ const CloudDB = {
             await this.client.from(store).delete().neq('id', 0);
           }
 
-          // Khusus produk: deduplikasi dulu agar data ganda/tumpuk bersih total
+          // Khusus produk: deduplikasi dulu & kompresi gambar agar muatan cloud sangat ringan (<25KB)
           let itemsToUpload = localItems;
           if (store === 'products') {
             const seen = new Set();
@@ -176,6 +214,11 @@ const CloudDB = {
               const key = (item.code || item.name || '').toLowerCase().trim();
               if (key && !seen.has(key)) {
                 seen.add(key);
+                if (item.image && typeof item.image === 'string' && item.image.length > 50000) {
+                  try {
+                    item.image = await compressImageStringHelper(item.image, 320, 0.78);
+                  } catch (e) {}
+                }
                 itemsToUpload.push(item);
               }
             }
@@ -187,12 +230,24 @@ const CloudDB = {
             return copy;
           });
 
+          // Gunakan chunk kecil (5 item) untuk produk agar payload ringan & tidak pernah ditolak Cloud
+          const chunkSize = store === 'products' ? 5 : 50;
           const insertedAll = [];
-          for (let i = 0; i < batch.length; i += 50) {
-            const chunk = batch.slice(i, i + 50);
+          for (let i = 0; i < batch.length; i += chunkSize) {
+            const chunk = batch.slice(i, i + chunkSize);
             const { data: inserted, error } = await this.client.from(store).insert(chunk).select();
             if (!error && Array.isArray(inserted)) {
               insertedAll.push(...inserted);
+            } else if (error) {
+              console.warn(`Batch insert pada ${store} gagal, mencoba upload satu per satu:`, error.message);
+              for (const single of chunk) {
+                const { data: sData, error: sErr } = await this.client.from(store).insert(single).select();
+                if (!sErr && Array.isArray(sData) && sData[0]) {
+                  insertedAll.push(sData[0]);
+                } else if (sErr) {
+                  console.error('Item gagal diupload:', single.name, sErr.message);
+                }
+              }
             }
           }
 
@@ -499,6 +554,9 @@ class CanteenDB {
 
   // Add record
   async add(storeName, data) {
+    if (storeName === 'products' && data.image && data.image.length > 50000) {
+      data.image = await compressImageStringHelper(data.image, 320, 0.78);
+    }
     if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
       try {
         const payload = { ...data };
@@ -507,9 +565,11 @@ class CanteenDB {
         if (!error && inserted) {
           await this.putLocal(storeName, inserted);
           return inserted.id;
+        } else if (error) {
+          console.warn(`CloudDB add failed for ${storeName}:`, error.message);
         }
       } catch (e) {
-        console.warn(`CloudDB add failed for ${storeName}:`, e);
+        console.warn(`CloudDB add exception for ${storeName}:`, e);
       }
     }
     return new Promise((resolve, reject) => {
@@ -522,11 +582,17 @@ class CanteenDB {
 
   // Put (update or create) record
   async put(storeName, data) {
+    if (storeName === 'products' && data.image && data.image.length > 50000) {
+      data.image = await compressImageStringHelper(data.image, 320, 0.78);
+    }
     if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client && data.id) {
       try {
-        await window.CloudDB.client.from(storeName).upsert(data);
+        const { error } = await window.CloudDB.client.from(storeName).upsert(data);
+        if (error) {
+          console.warn(`CloudDB put failed for ${storeName}:`, error.message);
+        }
       } catch (e) {
-        console.warn(`CloudDB put failed for ${storeName}:`, e);
+        console.warn(`CloudDB put exception for ${storeName}:`, e);
       }
     }
     return this.putLocal(storeName, data);
