@@ -1709,13 +1709,6 @@ const MasterProduk = {
         });
       }
     }
-      if (window.API && window.API.isOnline) {
-        await API.request('/api/products', {
-          method: 'POST',
-          body: JSON.stringify(prodObj)
-        });
-      }
-    }
 
     bootstrap.Modal.getInstance(document.getElementById('modal-product'))?.hide();
     await this.renderTable();
@@ -2980,7 +2973,6 @@ const HutangSupplier = {
               </span>
             </td>
             <td class="text-end pe-3">
-
               ${!isLunas ? `
                 <button class="btn btn-sm btn-success py-0 px-2 fw-semibold" onclick="HutangSupplier.openPayModal(${d.id})">
                   <i class="bi bi-cash me-1"></i> Bayar
