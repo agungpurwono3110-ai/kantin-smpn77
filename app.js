@@ -443,23 +443,24 @@ const App = {
     // 4. Kas Harian Balance
     const mutations = await db.getAll('cash_mutations');
     const todayMutations = mutations.filter(m => m.date === today);
-    const defaultInitialCash = await db.getSetting('default_initial_cash', 200000);
+    const defaultInitialCash = parseNumber(await db.getSetting('default_initial_cash', 200000));
     const modalMut = todayMutations.find(m => m.category === 'modal_awal');
-    const saldoAwal = modalMut ? modalMut.amount : defaultInitialCash;
+    const saldoAwal = modalMut ? parseNumber(modalMut.amount) : defaultInitialCash;
     
     let cashTunai = saldoAwal;
     let cashNonTunai = 0;
 
     todayMutations.forEach(m => {
       if (m.category === 'modal_awal') return; // Sudah dihitung sebagai saldoAwal
+      const amt = parseNumber(m.amount);
       if (m.type === 'in') {
-        if (m.payment_method === 'tunai') cashTunai += m.amount;
-        else cashNonTunai += m.amount;
+        if (m.payment_method === 'tunai') cashTunai += amt;
+        else cashNonTunai += amt;
       } else if (m.type === 'out') {
-        if (m.payment_method === 'tunai') cashTunai -= m.amount;
+        if (m.payment_method === 'tunai') cashTunai -= amt;
       }
     });
-    cashBalance = cashTunai; // Physical cash in drawer
+    const cashBalance = cashTunai; // Physical cash in drawer
 
     // Update Top Badges & Pills
     document.getElementById('top-quick-cash').textContent = formatRupiah(cashBalance);
@@ -2761,6 +2762,8 @@ const StokOpname = {
 
 // ==================== 8. KAS HARIAN ====================
 const KasHarian = {
+  currentSaldoAkhir: 0,
+
   async init() {
     document.getElementById('kas-filter-date').value = App.operationalDate;
     await this.renderTable();
@@ -2771,8 +2774,8 @@ const KasHarian = {
     const mutations = await db.getAll('cash_mutations');
     const dayMutations = mutations.filter(m => m.date === filterDate);
 
-    // Initial cash setting
-    const defaultInitialCash = await db.getSetting('default_initial_cash', 200000);
+    // Initial cash setting (wajib parseNumber karena settings Supabase bertipe TEXT)
+    const defaultInitialCash = parseNumber(await db.getSetting('default_initial_cash', 200000));
 
     let saldoAwal = 0;
     let totalIn = 0;
@@ -2785,7 +2788,7 @@ const KasHarian = {
 
     // Check if initial cash recorded
     const modalMut = dayMutations.find(m => m.category === 'modal_awal');
-    saldoAwal = modalMut ? modalMut.amount : defaultInitialCash;
+    saldoAwal = modalMut ? parseNumber(modalMut.amount) : defaultInitialCash;
 
     dayMutations.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -2797,21 +2800,24 @@ const KasHarian = {
     } else {
       tbody.innerHTML = dayMutations.map(m => {
         const isTunai = m.payment_method === 'tunai';
+        const amt = parseNumber(m.amount);
         if (m.type === 'in') {
           if (isTunai) {
-            totalIn += m.amount;
-            if (m.category === 'penjualan_tunai') cashSales += m.amount;
-            else otherIn += m.amount;
-            if (m.category !== 'modal_awal') runningBalance += m.amount;
+            if (m.category !== 'modal_awal') {
+              totalIn += amt;
+              if (m.category === 'penjualan_tunai') cashSales += amt;
+              else otherIn += amt;
+              runningBalance += amt;
+            }
           } else {
-            nonTunai += m.amount;
+            nonTunai += amt;
           }
         } else if (m.type === 'out') {
           if (isTunai) {
-            totalOut += m.amount;
-            if (m.category === 'restock_tunai') restockOut += m.amount;
-            else opsOut += m.amount;
-            runningBalance -= m.amount;
+            totalOut += amt;
+            if (m.category === 'restock_tunai') restockOut += amt;
+            else opsOut += amt;
+            runningBalance -= amt;
           }
         }
 
@@ -2825,8 +2831,8 @@ const KasHarian = {
             </td>
             <td><span class="badge bg-light text-secondary border text-capitalize">${(m.category || '').replace(/_/g, ' ')}</span></td>
             <td class="small fw-semibold text-navy">${m.description || '-'}</td>
-            <td class="text-end text-success fw-bold">${m.type === 'in' ? formatRupiah(m.amount) : '-'}</td>
-            <td class="text-end text-danger fw-bold">${m.type === 'out' ? formatRupiah(m.amount) : '-'}</td>
+            <td class="text-end text-success fw-bold">${m.type === 'in' ? formatRupiah(amt) : '-'}</td>
+            <td class="text-end text-danger fw-bold">${m.type === 'out' ? formatRupiah(amt) : '-'}</td>
             <td class="text-end fw-bold text-navy">${isTunai ? formatRupiah(runningBalance) : '<span class="text-muted small">Non-Tunai</span>'}</td>
             <td class="text-end pe-3 text-nowrap">
               <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="KasHarian.editMutation(${m.id})" title="Edit Catatan Kas">
@@ -2850,8 +2856,9 @@ const KasHarian = {
     document.getElementById('kas-beli-tunai').textContent = formatRupiah(restockOut);
     document.getElementById('kas-ops').textContent = formatRupiah(opsOut);
 
-    // Saldo Akhir Kas = Saldo Awal + Penerimaan Tunai - Pengeluaran Tunai
-    const saldoAkhir = saldoAwal + totalIn - totalOut;
+    // Saldo Akhir Kas = Saldo Awal + Penerimaan Tunai - Pengeluaran Tunai (murni aritmatika angka!)
+    const saldoAkhir = parseNumber(saldoAwal) + parseNumber(totalIn) - parseNumber(totalOut);
+    this.currentSaldoAkhir = saldoAkhir;
     document.getElementById('kas-saldo-akhir').textContent = formatRupiah(saldoAkhir);
     document.getElementById('kas-saldo-nontunai').textContent = formatRupiah(nonTunai);
   },
@@ -2860,9 +2867,9 @@ const KasHarian = {
     const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
     const mutations = await db.getAll('cash_mutations');
     const dayMutations = mutations.filter(m => m.date === filterDate);
-    const defaultInitialCash = await db.getSetting('default_initial_cash', 200000);
+    const defaultInitialCash = parseNumber(await db.getSetting('default_initial_cash', 200000));
     const modalMut = dayMutations.find(m => m.category === 'modal_awal');
-    const curAwal = modalMut ? modalMut.amount : defaultInitialCash;
+    const curAwal = modalMut ? parseNumber(modalMut.amount) : defaultInitialCash;
 
     const val = prompt(
       `UBAH SALDO AWAL KAS (MODAL KEMBALIAN):\n\nTanggal: ${formatDateIndo(filterDate)}\nSaldo Awal saat ini: ${formatRupiah(curAwal)}\n\nMasukkan nominal Saldo Awal Kas yang baru (Rp):`,
@@ -2894,6 +2901,9 @@ const KasHarian = {
     const setAsDefault = confirm(`Jadikan ${formatRupiah(newAmount)} sebagai modal kas awal default untuk hari-hari berikutnya?`);
     if (setAsDefault) {
       await db.setSetting('default_initial_cash', newAmount);
+      if (document.getElementById('set-initial-cash')) {
+        document.getElementById('set-initial-cash').value = newAmount;
+      }
     }
 
     alert(`✅ Saldo Awal Kas tanggal ${formatDateIndo(filterDate)} berhasil diubah menjadi ${formatRupiah(newAmount)}!`);
@@ -2913,7 +2923,7 @@ const KasHarian = {
       await db.delete('cash_mutations', m.id);
     }
 
-    // Rekam modal_awal = 0 agar sistem tahu tanggal ini saldo awalnya 0
+    // Rekam modal_awal = 0 agar sistem tidak kembali memakai angka default Pengaturan
     await db.add('cash_mutations', {
       date: filterDate,
       time: '06:30',
@@ -2925,6 +2935,16 @@ const KasHarian = {
       description: 'Modal awal uang kembalian kasir (Reset ke Rp 0)'
     });
 
+    const defaultCash = parseNumber(await db.getSetting('default_initial_cash', 0));
+    if (defaultCash > 0) {
+      if (confirm(`Apakah Modal Awal Default di Pengaturan (${formatRupiah(defaultCash)}) juga ingin diubah menjadi Rp 0?`)) {
+        await db.setSetting('default_initial_cash', 0);
+        if (document.getElementById('set-initial-cash')) {
+          document.getElementById('set-initial-cash').value = 0;
+        }
+      }
+    }
+
     alert(`✅ Saldo Awal Kas tanggal ${formatDateIndo(filterDate)} telah direset menjadi Rp 0.`);
     await this.renderTable();
     await App.refreshDashboard();
@@ -2932,8 +2952,7 @@ const KasHarian = {
 
   async koreksiSaldoAkhirPrompt() {
     const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
-    const curSaldoAkhirText = document.getElementById('kas-saldo-akhir').textContent;
-    const curSaldoAkhir = parseNumber(curSaldoAkhirText.replace(/[^0-9]/g, ''));
+    const curSaldoAkhir = parseNumber(this.currentSaldoAkhir);
 
     const val = prompt(
       `EDIT / KOREKSI SALDO KAS AKHIR:\n\nTanggal: ${formatDateIndo(filterDate)}\nSaldo Kas Akhir Sistem saat ini: ${formatRupiah(curSaldoAkhir)}\n\nMasukkan jumlah UANG FISIK RIIL yang ada di laci kasir saat ini (Rp):`,
@@ -2991,7 +3010,7 @@ const KasHarian = {
   async resetKasHariIniPrompt() {
     const filterDate = document.getElementById('kas-filter-date').value || App.operationalDate;
     if (!confirm(
-      `PERINGATAN BERSIHKAN / HAPUS KAS:\n\nApakah Anda yakin ingin MENGHAPUS seluruh mutasi kas pada tanggal ${formatDateIndo(filterDate)}?\n\n• Semua catatan kas masuk & kas keluar pada tanggal ini akan dibersihkan.\n• Saldo Kas Akhir akan kembali ke Rp 0.\n\nLanjutkan?`
+      `HAPUS KESELURUHAN SALDO KAS (${formatDateIndo(filterDate)}):\n\nApakah Anda yakin ingin MENGHAPUS / MENGENOLKAN seluruh catatan kas pada tanggal ini?\n\n• Seluruh mutasi kas masuk & kas keluar tanggal ini akan dihapus.\n• Saldo Awal dan Saldo Kas Akhir tanggal ini akan langsung menjadi Rp 0.\n\nLanjutkan?`
     )) {
       return;
     }
@@ -3002,7 +3021,29 @@ const KasHarian = {
       await db.delete('cash_mutations', m.id);
     }
 
-    alert(`✅ Seluruh mutasi kas pada tanggal ${formatDateIndo(filterDate)} telah berhasil dibersihkan!`);
+    // Rekam modal_awal = 0 agar tidak kembali menarik nominal default dari Pengaturan
+    await db.add('cash_mutations', {
+      date: filterDate,
+      time: '06:30',
+      timestamp: new Date(filterDate + 'T06:30:00').getTime() || Date.now(),
+      type: 'in',
+      category: 'modal_awal',
+      payment_method: 'tunai',
+      amount: 0,
+      description: 'Reset keseluruhan kas ke Rp 0'
+    });
+
+    const defaultCash = parseNumber(await db.getSetting('default_initial_cash', 0));
+    if (defaultCash > 0) {
+      if (confirm(`Saat ini di Pengaturan masih tersimpan "Modal Awal Default" sebesar ${formatRupiah(defaultCash)}.\n\nApakah Modal Awal Default tersebut juga ingin ikut dihapus menjadi Rp 0?`)) {
+        await db.setSetting('default_initial_cash', 0);
+        if (document.getElementById('set-initial-cash')) {
+          document.getElementById('set-initial-cash').value = 0;
+        }
+      }
+    }
+
+    alert(`✅ Seluruh Saldo Kas tanggal ${formatDateIndo(filterDate)} telah berhasil dihapus / dinolkan menjadi Rp 0!`);
     await this.renderTable();
     await App.refreshDashboard();
   },
@@ -4126,6 +4167,7 @@ const Pengaturan = {
     await db.setSetting('default_initial_cash', cash);
 
     alert('Pengaturan identitas usaha dan modal kas berhasil disimpan!');
+    if (window.KasHarian) await KasHarian.renderTable();
     await App.refreshDashboard();
   },
 
