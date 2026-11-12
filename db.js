@@ -51,6 +51,41 @@ async function compressImageStringHelper(dataUrl, maxDim = 320, quality = 0.78) 
   });
 }
 
+// Daftar kolom resmi di tabel Cloud Supabase agar upsert/insert tidak pernah ditolak error skema
+const CLOUD_COLUMNS = {
+  products: ['id', 'code', 'name', 'category', 'buy_price', 'sell_price', 'profit', 'initial_stock', 'min_stock', 'stock', 'unit', 'image', 'updated_at'],
+  transactions: ['id', 'order_number', 'date', 'time', 'timestamp', 'items', 'total', 'total_hpp', 'total_profit', 'payment_method', 'employee_name', 'cash_given', 'change', 'status', 'cancel_reason', 'created_at'],
+  restocks: ['id', 'invoice_no', 'date', 'supplier_id', 'supplier_name', 'product_id', 'product_name', 'qty', 'buy_price', 'total', 'payment_method', 'payment_status', 'due_date', 'notes', 'created_at'],
+  expenses: ['id', 'date', 'category', 'amount', 'payment_method', 'notes', 'ref_id', 'created_at'],
+  suppliers: ['id', 'name', 'phone', 'address', 'notes', 'created_at'],
+  debts: ['id', 'restock_id', 'supplier_id', 'supplier_name', 'invoice_no', 'date', 'total', 'paid', 'remaining', 'due_date', 'status', 'payments', 'created_at'],
+  cash_mutations: ['id', 'date', 'time', 'timestamp', 'type', 'category', 'payment_method', 'amount', 'description', 'ref_id', 'created_at'],
+  stock_opname: ['id', 'date', 'items', 'status', 'closed_at', 'updated_at'],
+  daily_closures: ['id', 'date', 'closed_at', 'opening_cash', 'total_omzet', 'total_cash_sales', 'total_cashless_sales', 'total_hpp', 'gross_profit', 'total_expenses', 'net_profit', 'opname_id'],
+  settings: ['key', 'value', 'updated_at']
+};
+
+function sanitizeForCloud(storeName, data, stripId = false) {
+  if (!data || typeof data !== 'object') return data;
+  const allowed = CLOUD_COLUMNS[storeName];
+  const clean = {};
+  if (allowed) {
+    for (const col of allowed) {
+      if (stripId && col === 'id') continue;
+      if (data[col] !== undefined) {
+        clean[col] = data[col];
+      }
+    }
+  } else {
+    Object.assign(clean, data);
+    if (stripId) delete clean.id;
+  }
+  if (storeName === 'cash_mutations' && clean.ref_id !== undefined && clean.ref_id !== null) {
+    clean.ref_id = String(clean.ref_id);
+  }
+  return clean;
+}
+
 const CloudDB = {
   client: null,
   isOnline: false,
@@ -224,11 +259,7 @@ const CloudDB = {
             }
           }
 
-          const batch = itemsToUpload.map(item => {
-            const copy = { ...item };
-            delete copy.id;
-            return copy;
-          });
+          const batch = itemsToUpload.map(item => sanitizeForCloud(store, item, true));
 
           // Gunakan chunk kecil (5 item) untuk produk agar payload ringan & tidak pernah ditolak Cloud
           const chunkSize = store === 'products' ? 5 : 50;
@@ -335,13 +366,14 @@ const CloudDB = {
       }
       if (!cloudProducts || cloudProducts.length === 0) {
         console.log('Cloud masih kosong. Mengunggah data awal komputer kantor ke cloud...');
-        const localProducts = await db.getAll('products');
+        const localProducts = await new Promise((resolve) => {
+          const s = db.tx('products', 'readonly');
+          const req = s.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
         if (localProducts.length > 0) {
-          const toUpload = localProducts.map(p => {
-            const item = { ...p };
-            delete item.id;
-            return item;
-          });
+          const toUpload = localProducts.map(p => sanitizeForCloud('products', p, true));
           const { error: insErr } = await this.client.from('products').insert(toUpload);
           if (!insErr) {
             console.log('✅ Seluruh produk komputer kantor berhasil diunggah ke Cloud Supabase!');
@@ -470,9 +502,9 @@ class CanteenDB {
       try {
         const orderCol = storeName === 'settings' ? 'key' : 'id';
         const { data, error } = await window.CloudDB.client.from(storeName).select('*').order(orderCol, { ascending: true });
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (!error && Array.isArray(data)) {
           // Bersihkan data lokal lama & perbarui dengan data resmi dari Cloud
-          // Ini mencegah munculnya data 'hantu' atau sisa duplikat di HP
+          // Termasuk jika di Cloud kosong (misal semua transaksi/mutasi sudah dihapus)
           await this.clear(storeName);
           for (const item of data) {
             await this.putLocal(storeName, item);
@@ -555,8 +587,7 @@ class CanteenDB {
     }
     if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client) {
       try {
-        const payload = { ...data };
-        delete payload.id;
+        const payload = sanitizeForCloud(storeName, data, true);
         const { data: inserted, error } = await window.CloudDB.client.from(storeName).insert(payload).select().single();
         if (!error && inserted) {
           await this.putLocal(storeName, inserted);
@@ -583,7 +614,8 @@ class CanteenDB {
     }
     if (window.CloudDB && window.CloudDB.isOnline && window.CloudDB.client && data.id) {
       try {
-        const { error } = await window.CloudDB.client.from(storeName).upsert(data);
+        const cloudPayload = sanitizeForCloud(storeName, data, false);
+        const { error } = await window.CloudDB.client.from(storeName).upsert(cloudPayload);
         if (error) {
           console.warn(`CloudDB put failed for ${storeName}:`, error.message);
         }

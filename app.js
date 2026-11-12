@@ -31,6 +31,34 @@ function getLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
+function parseTrxItems(items) {
+  if (Array.isArray(items)) return items;
+  if (typeof items === 'string') {
+    try { return JSON.parse(items || '[]'); } catch (e) { return []; }
+  }
+  return [];
+}
+
+function findMatchingProduct(products, itemRef) {
+  if (!products || !itemRef) return null;
+  const targetId = itemRef.id !== undefined ? itemRef.id : itemRef.product_id;
+  if (targetId !== undefined && targetId !== null) {
+    const byId = products.find(p => String(p.id) === String(targetId));
+    if (byId) return byId;
+  }
+  const code = (itemRef.code || '').toLowerCase().trim();
+  if (code) {
+    const byCode = products.find(p => (p.code || '').toLowerCase().trim() === code);
+    if (byCode) return byCode;
+  }
+  const name = (itemRef.name || itemRef.product_name || '').toLowerCase().trim();
+  if (name) {
+    const byName = products.find(p => (p.name || '').toLowerCase().trim() === name);
+    if (byName) return byName;
+  }
+  return null;
+}
+
 // ==================== APP CONTROLLER ====================
 const App = {
   currentUser: null,
@@ -378,7 +406,7 @@ const App = {
     todayTrx.forEach(t => {
       totalOmzet += t.total;
       totalHPP += (t.total_hpp || 0);
-      t.items.forEach(item => {
+      parseTrxItems(t.items).forEach(item => {
         totalItemsSold += item.qty;
         if (!productSoldCounts[item.name]) {
           productSoldCounts[item.name] = { name: item.name, qty: 0, omzet: 0 };
@@ -1110,8 +1138,10 @@ const POS = {
       this.cart = [];
       this.renderCart();
 
-      // Refresh Products & Dashboard
+      // Refresh Products, Stock, Opname & Dashboard
       await this.renderProducts();
+      if (window.StokBarang) await StokBarang.renderTable();
+      if (window.StokOpname) await StokOpname.loadOpnameTable();
       await App.refreshDashboard();
 
       // Show Thermal Receipt Modal
@@ -1233,7 +1263,7 @@ const Rekap = {
     let totalProfit = 0;
 
     dayTrxs.forEach(t => {
-      t.items.forEach(item => {
+      parseTrxItems(t.items).forEach(item => {
         if (filterCat && item.category !== filterCat) return;
 
         if (!productSalesMap[item.id]) {
@@ -2102,17 +2132,21 @@ const StokBarang = {
     const restocks = await db.getAll('restocks');
     const dayRestocks = restocks.filter(r => r.date === today);
 
-    // Calculate product sold & restocked today
+    // Calculate product sold & restocked today using smart ID/Code/Name matching
     const soldMap = {};
     dayTrxs.forEach(t => {
-      t.items.forEach(i => {
-        soldMap[i.id] = (soldMap[i.id] || 0) + i.qty;
+      parseTrxItems(t.items).forEach(i => {
+        const matched = findMatchingProduct(products, i);
+        const key = matched ? matched.id : i.id;
+        soldMap[key] = (soldMap[key] || 0) + parseNumber(i.qty);
       });
     });
 
     const restockMap = {};
     dayRestocks.forEach(r => {
-      restockMap[r.product_id] = (restockMap[r.product_id] || 0) + r.qty;
+      const matched = findMatchingProduct(products, r);
+      const key = matched ? matched.id : r.product_id;
+      restockMap[key] = (restockMap[key] || 0) + parseNumber(r.qty);
     });
 
     const filtered = products.filter(p => {
@@ -2134,9 +2168,8 @@ const StokBarang = {
     tbody.innerHTML = filtered.map((p, idx) => {
       const masuk = restockMap[p.id] || 0;
       const terjual = soldMap[p.id] || 0;
-      // Formula: Stok Tersedia = Stok Awal + Masuk - Terjual
-      // In persistent DB, p.initial_stock is retained from morning opening
-      const stokAwal = p.initial_stock !== undefined ? p.initial_stock : (p.stock + terjual - masuk);
+      // Hitung Stok Awal hari ini secara konsisten: Stok Awal = Stok Saat Ini + Terjual - Masuk
+      const stokAwal = p.stock + terjual - masuk;
 
       let statusBadge = '<span class="badge bg-success">Aman</span>';
       if (p.stock <= 0) {
@@ -2407,43 +2440,79 @@ const StokOpname = {
     const restocks = await db.getAll('restocks');
     const dayRestocks = restocks.filter(r => r.date === today);
 
-    // Sum sold & restock per product
+    // Sum sold & restock per product using smart ID/Code/Name resolution
     const soldMap = {};
     dayTrxs.forEach(t => {
-      t.items.forEach(i => {
-        soldMap[i.id] = (soldMap[i.id] || 0) + i.qty;
+      parseTrxItems(t.items).forEach(i => {
+        const matched = findMatchingProduct(products, i);
+        const key = matched ? matched.id : i.id;
+        soldMap[key] = (soldMap[key] || 0) + parseNumber(i.qty);
       });
     });
 
     const restockMap = {};
     dayRestocks.forEach(r => {
-      restockMap[r.product_id] = (restockMap[r.product_id] || 0) + r.qty;
+      const matched = findMatchingProduct(products, r);
+      const key = matched ? matched.id : r.product_id;
+      restockMap[key] = (restockMap[key] || 0) + parseNumber(r.qty);
     });
 
-    // Check if draft opname exists for today
+    // Check if draft/closed opname exists for today
     const opnames = await db.getAll('stock_opname');
     const existingDraft = opnames.find(o => o.date === today);
+    const savedItemsList = existingDraft ? parseTrxItems(existingDraft.items) : [];
 
     this.currentOpnameItems = products.map((p, idx) => {
       const masuk = restockMap[p.id] || 0;
       const terjual = soldMap[p.id] || 0;
-      const stokAwal = p.initial_stock !== undefined ? p.initial_stock : (p.stock + terjual - masuk);
-      // Rumus Stok Akhir Sistem = Stok Awal + Barang Masuk - Total Terjual
-      const sistemStock = stokAwal + masuk - terjual;
 
       let savedItem = null;
-      if (existingDraft && existingDraft.items) {
-        savedItem = existingDraft.items.find(i => i.productId === p.id);
+      if (savedItemsList.length > 0) {
+        savedItem = savedItemsList.find(i =>
+          String(i.productId) === String(p.id) ||
+          (i.code && p.code && i.code.toLowerCase().trim() === p.code.toLowerCase().trim()) ||
+          (i.name && p.name && i.name.toLowerCase().trim() === p.name.toLowerCase().trim())
+        );
       }
 
-      let fisikStock = p.stock;
-      if (savedItem) {
-        if (savedItem.fisikStock !== undefined) fisikStock = savedItem.fisikStock;
-        else if (savedItem.physical_stock !== undefined) fisikStock = savedItem.physical_stock;
+      if (closed && savedItem) {
+        const sAwal = savedItem.stokAwal !== undefined ? parseNumber(savedItem.stokAwal) : (p.stock + terjual - masuk);
+        const sSistem = savedItem.sistemStock !== undefined ? parseNumber(savedItem.sistemStock) : p.stock;
+        const sFisik = savedItem.fisikStock !== undefined ? parseNumber(savedItem.fisikStock) : (savedItem.physical_stock !== undefined ? parseNumber(savedItem.physical_stock) : p.stock);
+        return {
+          no: idx + 1,
+          productId: p.id,
+          code: p.code,
+          name: p.name,
+          category: p.category,
+          unit: p.unit,
+          stokAwal: sAwal,
+          masuk: savedItem.masuk !== undefined ? parseNumber(savedItem.masuk) : masuk,
+          terjual: savedItem.terjual !== undefined ? parseNumber(savedItem.terjual) : terjual,
+          sistemStock: sSistem,
+          fisikStock: sFisik,
+          selisih: sFisik - sSistem,
+          diffReason: savedItem.diffReason || savedItem.diff_reason || 'Cocok'
+        };
       }
-      fisikStock = parseNumber(fisikStock);
+
+      // Hitung Stok Awal hari ini secara matematis konsisten dengan p.stock terkini
+      const stokAwal = p.stock + terjual - masuk;
+      const sistemStock = stokAwal + masuk - terjual; // = p.stock
+
+      let fisikStock = sistemStock;
+      let diffReason = 'Cocok';
+      if (savedItem) {
+        const savedFisik = savedItem.fisikStock !== undefined ? parseNumber(savedItem.fisikStock) : (savedItem.physical_stock !== undefined ? parseNumber(savedItem.physical_stock) : sistemStock);
+        const savedSistem = savedItem.sistemStock !== undefined ? parseNumber(savedItem.sistemStock) : sistemStock;
+        if (savedFisik !== savedSistem) {
+          fisikStock = savedFisik;
+          diffReason = savedItem.diffReason || savedItem.diff_reason || 'Kesalahan pencatatan';
+        }
+      }
+
       const selisih = fisikStock - sistemStock;
-      const diffReason = savedItem ? (savedItem.diffReason || savedItem.diff_reason || 'Cocok') : 'Cocok';
+      if (selisih === 0) diffReason = 'Cocok';
 
       return {
         no: idx + 1,
@@ -3499,7 +3568,8 @@ const RiwayatTransaksi = {
     }
 
     tbody.innerHTML = filtered.map(t => {
-      const itemNames = t.items.map(i => `${i.name} (x${i.qty})`).join(', ');
+      const itemsList = parseTrxItems(t.items);
+      const itemNames = itemsList.map(i => `${i.name} (x${i.qty})`).join(', ');
       const isCancelled = t.status === 'dibatalkan';
       const isKonsumsi = t.payment_method === 'konsumsi';
 
@@ -3521,9 +3591,17 @@ const RiwayatTransaksi = {
               ${isCancelled ? 'Dibatalkan' : isKonsumsi ? 'Konsumsi' : 'Selesai'}
             </span>
           </td>
-          <td class="text-end pe-3">
-            <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="RiwayatTransaksi.showDetail(${t.id})">
-              <i class="bi bi-eye me-1"></i> Rincian
+          <td class="text-end pe-3 text-nowrap">
+            <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="RiwayatTransaksi.showDetail(${t.id})" title="Lihat Rincian">
+              <i class="bi bi-eye"></i>
+            </button>
+            ${!isCancelled ? `
+              <button class="btn btn-sm btn-outline-warning text-dark py-0 px-2 me-1" onclick="RiwayatTransaksi.showCancelPrompt(${t.id})" title="Batalkan Transaksi">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            ` : ''}
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="RiwayatTransaksi.deleteTransaction(${t.id})" title="Hapus Permanen">
+              <i class="bi bi-trash"></i>
             </button>
           </td>
         </tr>
@@ -3538,6 +3616,7 @@ const RiwayatTransaksi = {
 
     const detailBody = document.getElementById('trx-detail-body');
     const isCancelled = trx.status === 'dibatalkan';
+    const itemsList = parseTrxItems(trx.items);
 
     detailBody.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
@@ -3567,7 +3646,7 @@ const RiwayatTransaksi = {
             </tr>
           </thead>
           <tbody>
-            ${trx.items.map(item => `
+            ${itemsList.map(item => `
               <tr>
                 <td>${item.name}</td>
                 <td class="text-center">${item.qty}</td>
@@ -3593,76 +3672,153 @@ const RiwayatTransaksi = {
     `;
 
     const cancelBtn = document.getElementById('btn-cancel-trx');
-    if (isCancelled) {
-      cancelBtn.classList.add('d-none');
-    } else {
-      cancelBtn.classList.remove('d-none');
+    if (cancelBtn) {
+      if (isCancelled) cancelBtn.classList.add('d-none');
+      else cancelBtn.classList.remove('d-none');
     }
 
     const modal = new bootstrap.Modal(document.getElementById('modal-trx-detail'));
     modal.show();
   },
 
-  async showCancelPrompt() {
-    if (!this.selectedTrx) return;
-    const reason = prompt(`Masukkan alasan pembatalan transaksi #${this.selectedTrx.order_number}:`, 'Salah input oleh kasir / dibatalkan pembeli');
-    if (!reason) return;
+  async showCancelPrompt(directId = null) {
+    const trx = directId ? await db.get('transactions', directId) : this.selectedTrx;
+    if (!trx) return;
+    if (trx.status === 'dibatalkan') {
+      alert('Transaksi ini sudah dibatalkan sebelumnya.');
+      return;
+    }
 
-    if (!confirm('PERINGATAN: Membatalkan transaksi ini akan MENGEMBALIKAN STOK BARANG ke etalase dan MEMOTONG KAS PENJUALAN. Lanjutkan?')) return;
+    const reason = prompt(`Masukkan alasan pembatalan transaksi #${trx.order_number}:`, 'Salah input oleh kasir / dibatalkan pembeli');
+    if (reason === null) return;
+    const finalReason = reason.trim() || 'Dibatalkan oleh admin/kasir';
+
+    if (!confirm(`PERINGATAN PEMBATALAN:\n\nMembatalkan transaksi #${trx.order_number} (${formatRupiah(trx.total)}) akan:\n• Mengurangi Omzet / Pendapatan hari ini\n• Mengembalikan stok barang ke etalase\n• Memotong / mengembalikan kas penjualan\n\nLanjutkan?`)) return;
 
     try {
-      const trx = this.selectedTrx;
+      // 1. Update status transaksi (TANPA field cancelled_at agar lolos validasi Cloud Supabase)
       trx.status = 'dibatalkan';
-      trx.cancel_reason = reason;
-      trx.cancelled_at = new Date().toISOString();
+      trx.cancel_reason = `${finalReason} (${new Date().toLocaleTimeString('id-ID')})`;
+      delete trx.cancelled_at;
       await db.put('transactions', trx);
 
-      // 1. Restitute Stock (Kembalikan stok)
-      for (const item of trx.items) {
-        const prod = await db.get('products', item.id);
+      // 2. Restitute Stock (Kembalikan stok dengan pencocokan cerdas ID/Kode/Nama)
+      const allProds = await db.getAll('products');
+      const itemsList = parseTrxItems(trx.items);
+      for (const item of itemsList) {
+        const prod = findMatchingProduct(allProds, item);
         if (prod) {
-          prod.stock += item.qty;
+          prod.stock += parseNumber(item.qty);
           await db.put('products', prod);
         }
       }
 
-      // 2. Reverse Cash Mutation if Cash
+      // 3. Reverse Cash Mutation if Cash
       if (trx.payment_method === 'tunai') {
         const now = new Date();
         await db.add('cash_mutations', {
-          date: App.operationalDate,
+          date: trx.date || App.operationalDate,
           time: now.toTimeString().split(' ')[0].substring(0, 5),
           timestamp: now.getTime(),
           type: 'out',
           category: 'batal_penjualan',
           payment_method: 'tunai',
           amount: trx.total,
-          description: `Pembatalan penjualan kasir #${trx.order_number} (${reason})`,
-          ref_id: trx.id
+          description: `Pembatalan penjualan kasir #${trx.order_number} (${finalReason})`,
+          ref_id: String(trx.id)
         });
       }
 
-      // 3. Delete Expense if Konsumsi Karyawan
+      // 4. Delete Expense if Konsumsi Karyawan
       if (trx.payment_method === 'konsumsi') {
         const allExpenses = await db.getAll('expenses');
-        const relatedExp = allExpenses.find(e => e.ref_id === trx.id);
+        const relatedExp = allExpenses.find(e => String(e.ref_id) === String(trx.id) || (e.notes && e.notes.includes('#' + trx.order_number)));
         if (relatedExp) {
           await db.delete('expenses', relatedExp.id);
         }
       }
 
       bootstrap.Modal.getInstance(document.getElementById('modal-trx-detail'))?.hide();
-      alert(`Transaksi #${trx.order_number} berhasil dibatalkan. Stok barang telah dikembalikan.`);
+      alert(`✅ Transaksi #${trx.order_number} berhasil DIBATALKAN!\nPendapatan telah dikurangi & stok barang sudah dikembalikan.`);
 
       await this.renderTable();
       await MasterProduk.renderTable();
       await StokBarang.renderTable();
+      await StokOpname.loadOpnameTable();
       await POS.renderProducts();
       await KasHarian.renderTable();
+      if (window.Rekap) await Rekap.loadRekap();
+      if (window.LaporanLaba) await LaporanLaba.loadReport();
+      if (window.LaporanBulanan) await LaporanBulanan.loadReport();
       await App.refreshDashboard();
 
     } catch (err) {
       alert('Gagal membatalkan transaksi: ' + err.message);
+    }
+  },
+
+  async deleteTransaction(directId = null) {
+    const trx = directId ? await db.get('transactions', directId) : this.selectedTrx;
+    if (!trx) return;
+
+    const isAlreadyCancelled = trx.status === 'dibatalkan';
+    const warnMsg = isAlreadyCancelled
+      ? `HAPUS PERMANEN RIWAYAT:\n\nHapus permanen catatan transaksi yang sudah dibatalkan (#${trx.order_number}) dari sistem dan Cloud?`
+      : `HAPUS PERMANEN TRANSAKSI:\n\nAnda akan MENGHAPUS PERMANEN transaksi #${trx.order_number} (${formatRupiah(trx.total)})!\n• Stok barang otomatis dikembalikan ke etalase.\n• Pendapatan/Omzet dan Kas otomatis dikurangi.\n• Transaksi terhapus total dari riwayat.\n\nYakin lanjutkan?`;
+
+    if (!confirm(warnMsg)) return;
+
+    try {
+      // Jika belum dibatalkan sebelumnya, kembalikan stok dulu
+      if (!isAlreadyCancelled) {
+        const allProds = await db.getAll('products');
+        const itemsList = parseTrxItems(trx.items);
+        for (const item of itemsList) {
+          const prod = findMatchingProduct(allProds, item);
+          if (prod) {
+            prod.stock += parseNumber(item.qty);
+            await db.put('products', prod);
+          }
+        }
+      }
+
+      // Hapus seluruh mutasi kas yang terkait dengan transaksi ini
+      const allMutations = await db.getAll('cash_mutations');
+      const relatedMuts = allMutations.filter(m =>
+        String(m.ref_id) === String(trx.id) ||
+        (m.description && m.description.includes('#' + trx.order_number))
+      );
+      for (const m of relatedMuts) {
+        await db.delete('cash_mutations', m.id);
+      }
+
+      // Hapus beban konsumsi jika metode pembayaran konsumsi
+      if (trx.payment_method === 'konsumsi') {
+        const allExpenses = await db.getAll('expenses');
+        const relatedExp = allExpenses.find(e => String(e.ref_id) === String(trx.id) || (e.notes && e.notes.includes('#' + trx.order_number)));
+        if (relatedExp) {
+          await db.delete('expenses', relatedExp.id);
+        }
+      }
+
+      // Hapus transaksi dari Cloud & Lokal secara permanen
+      await db.delete('transactions', trx.id);
+
+      bootstrap.Modal.getInstance(document.getElementById('modal-trx-detail'))?.hide();
+      alert(`✅ Transaksi #${trx.order_number} berhasil DIHAPUS PERMANEN!\nPendapatan, kas, dan stok barang otomatis diperbarui.`);
+
+      await this.renderTable();
+      await MasterProduk.renderTable();
+      await StokBarang.renderTable();
+      await StokOpname.loadOpnameTable();
+      await POS.renderProducts();
+      await KasHarian.renderTable();
+      if (window.Rekap) await Rekap.loadRekap();
+      if (window.LaporanLaba) await LaporanLaba.loadReport();
+      if (window.LaporanBulanan) await LaporanBulanan.loadReport();
+      await App.refreshDashboard();
+    } catch (err) {
+      alert('Gagal menghapus transaksi: ' + err.message);
     }
   },
 

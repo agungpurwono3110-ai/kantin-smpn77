@@ -2100,11 +2100,16 @@ Selamat belajar di SMPN 77.</textarea>
         <div class="modal-body p-4" id="trx-detail-body">
           <!-- Injected via JS -->
         </div>
-        <div class="modal-footer bg-light p-3 d-flex justify-content-between">
-          <button type="button" class="btn btn-outline-danger" id="btn-cancel-trx" onclick="RiwayatTransaksi.showCancelPrompt()">
-            <i class="bi bi-x-circle me-1"></i> Batalkan Transaksi
-          </button>
-          <div>
+        <div class="modal-footer bg-light p-3 d-flex flex-wrap justify-content-between gap-2">
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-warning text-dark fw-semibold" id="btn-cancel-trx" onclick="RiwayatTransaksi.showCancelPrompt()">
+              <i class="bi bi-x-circle me-1"></i> Batalkan Transaksi
+            </button>
+            <button type="button" class="btn btn-outline-danger fw-semibold" id="btn-delete-trx" onclick="RiwayatTransaksi.deleteTransaction()">
+              <i class="bi bi-trash me-1"></i> Hapus Permanen
+            </button>
+          </div>
+          <div class="d-flex gap-2">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
             <button type="button" class="btn btn-primary" id="btn-reprint-trx" onclick="RiwayatTransaksi.reprintReceipt()">
               <i class="bi bi-printer me-1"></i> Cetak Ulang Struk
